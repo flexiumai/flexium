@@ -1,0 +1,120 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytype static type analyzer
+.pytype/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Checkpoints
+/checkpoints/
+*.pt
+*.pth
+
+# MkDocs documentation site
+site/
+
+# gRPC generated files (optional - can be regenerated)
+# *_pb2.py
+# *_pb2_grpc.py
+
+# Config files with secrets
+.flexiumrc
+
+# Logs
+*.log
+
+# Internal documentation (not for public release)
+docs/internal/
+docs/market-research.md
+
+# Private files (keep in flexiumai/flexium-internal)
+BUSINESS.md
+IDEAS.md
+CLAUDE.md
+
+# Data files
+data/
+
+# Temporary/generated files
+gpu_control_plan.html
+=*
+
+# Lightning logs (checkpoints, metrics)
+lightning_logs/
+
+# Generated sample images from examples
+examples/gan/samples/
+examples/diffusion/diffusion_samples/
