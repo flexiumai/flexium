@@ -1,20 +1,13 @@
-"""Orchestrator module for flexium.
+"""Orchestrator client module for flexium.
 
-Provides the orchestrator server that manages training processes
-across multiple GPUs and machines.
+Provides the client for connecting to the orchestrator server from
+training processes.
 """
 
-from flexium.orchestrator.registry import ProcessRegistry
-from flexium.orchestrator.device_manager import DeviceManager
-
-__all__ = [
-    "ProcessRegistry",
-    "DeviceManager",
-]
+__all__ = []
 
 # gRPC-dependent modules are optional
 try:
-    from flexium.orchestrator.server import OrchestratorServer
     from flexium.orchestrator.client import (
         OrchestratorClient,
         ConnectionState,
@@ -22,7 +15,6 @@ try:
     )
 
     __all__.extend([
-        "OrchestratorServer",
         "OrchestratorClient",
         "ConnectionState",
         "ConnectionManager",

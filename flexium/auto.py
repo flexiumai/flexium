@@ -40,6 +40,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
+import grpc
+
 from flexium.config import (
     FlexiumConfig,
     load_config,
@@ -717,7 +719,9 @@ def _do_pause() -> None:
                     memory_reserved=0,
                 )
 
-                response = _orchestrator_client._stub.Heartbeat(request)
+                response = _orchestrator_client._stub.Heartbeat(
+                    request, metadata=_orchestrator_client._get_grpc_metadata()
+                )
 
                 if response.should_migrate and response.target_device:
                     if response.target_device != "__PAUSE__":
@@ -994,7 +998,9 @@ def _send_heartbeat() -> None:
             cuda_device_count=cuda_device_count,
         )
 
-        response = _orchestrator_client._stub.Heartbeat(request)
+        response = _orchestrator_client._stub.Heartbeat(
+            request, metadata=_orchestrator_client._get_grpc_metadata()
+        )
 
         if response.should_migrate and response.target_device:
             # Don't migrate if we're inside _do_pause()
@@ -1016,6 +1022,41 @@ def _send_heartbeat() -> None:
                     f"Ignoring migration request during pause: {response.target_device}"
                 )
 
+    except grpc.RpcError as e:
+        # gRPC connection error - attempt reconnection
+        if _orchestrator_client is not None:
+            cm = _orchestrator_client.connection_manager
+            from flexium.orchestrator.client import ConnectionState
+
+            if cm.is_healthy:
+                # First failure - mark as reconnecting and try immediately
+                print(f"[flexium] Lost connection to orchestrator, attempting reconnect...")
+                sys.stdout.flush()
+                cm.on_failure(e)
+                # Try reconnect immediately
+                if _attempt_reconnect():
+                    print(f"[flexium] Reconnected to orchestrator!")
+                    sys.stdout.flush()
+
+            elif cm.state == ConnectionState.RECONNECTING:
+                # Still in reconnecting phase - keep trying
+                if _attempt_reconnect():
+                    print(f"[flexium] Reconnected to orchestrator!")
+                    sys.stdout.flush()
+                else:
+                    # Count this as another failure
+                    cm.on_failure(e)
+
+            elif cm.should_attempt_reconnect():
+                # In local mode - try periodic reconnect
+                print(f"[flexium] Attempting reconnection to orchestrator...")
+                sys.stdout.flush()
+                cm.reset_for_reconnect()
+                if _attempt_reconnect():
+                    print(f"[flexium] Reconnected to orchestrator!")
+                    sys.stdout.flush()
+                else:
+                    cm.on_failure(e)
     except Exception as e:
         logger.debug(f"Heartbeat error: {e}")
 
@@ -1028,6 +1069,69 @@ def _heartbeat_loop() -> None:
         if not _migration_in_progress and not _pause_in_progress:
             _send_heartbeat()
         _stop_heartbeat.wait(timeout=3.0)
+
+
+def _attempt_reconnect() -> bool:
+    """Attempt to reconnect to orchestrator after connection loss.
+
+    Re-registers with the orchestrator using stored credentials.
+
+    Returns:
+        True if reconnection succeeded, False otherwise.
+    """
+    global _orchestrator_client
+
+    if _orchestrator_client is None:
+        return False
+
+    try:
+        # Re-connect the gRPC channel
+        _orchestrator_client.connect()
+
+        # Re-register with stored parameters
+        from flexium.utils.gpu_info import get_gpu_info
+
+        gpu_uuid = ""
+        gpu_name = ""
+        gpu_info = get_gpu_info(_physical_device)
+        if gpu_info:
+            gpu_uuid = gpu_info.uuid
+            gpu_name = gpu_info.name
+
+        from flexium.proto import orchestrator_pb2 as pb2
+        import socket
+
+        request = pb2.RegisterRequest(
+            process_id=_process_id,
+            device=_physical_device,
+            hostname=socket.gethostname(),
+            metadata=_orchestrator_client._metadata or {},
+            gpu_uuid=gpu_uuid,
+            gpu_name=gpu_name,
+            min_gpus=getattr(_orchestrator_client, '_min_gpus', 1),
+            max_gpus=getattr(_orchestrator_client, '_max_gpus', 1),
+            max_vram=getattr(_orchestrator_client, '_max_vram', 0),
+            can_share=getattr(_orchestrator_client, '_can_share', True),
+            priority=getattr(_orchestrator_client, '_priority', 50),
+            preemptible=getattr(_orchestrator_client, '_preemptible', True),
+            migratable=getattr(_orchestrator_client, '_migratable', True),
+        )
+
+        response = _orchestrator_client._stub.Register(
+            request, metadata=_orchestrator_client._get_grpc_metadata()
+        )
+
+        if response.success:
+            _orchestrator_client.connection_manager.on_success()
+            print(f"[flexium] Reconnected to orchestrator")
+            sys.stdout.flush()
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        logger.debug(f"Reconnection failed: {e}")
+        return False
 
 
 def _cache_gpu_info_at_startup() -> None:

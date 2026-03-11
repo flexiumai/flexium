@@ -138,17 +138,6 @@ with flexium.auto.run():
 - CUDA 12.0+
 - Linux x86_64
 
-## Pricing
-
-| Tier | Price | GPUs | Support |
-|------|-------|------|---------|
-| **Free** | $0/mo | Up to 4 | Community |
-| **Pro** | $99/mo | Unlimited | Email (48h) |
-| **Team** | $499/mo | Unlimited | Priority (24h) |
-| **Enterprise** | Custom | Unlimited | Dedicated |
-
-[**Sign up free →**](https://flexium.ai)
-
 ## Documentation
 
 - [Getting Started](https://docs.flexium.ai/getting-started)

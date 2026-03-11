@@ -243,13 +243,14 @@ class OrchestratorClient:
         """Initialize the orchestrator client.
 
         Parameters:
-            address: Server address in host:port format.
+            address: Server address in host:port or host:port/workspace format.
             heartbeat_interval: Interval between heartbeats in seconds.
             max_retries: Maximum connection retry attempts.
             retry_delay: Initial delay between retries in seconds.
             reconnect_interval: Interval for reconnection attempts in local mode.
         """
-        self.address = address
+        # Parse workspace from address if present (e.g., "host:port/workspace")
+        self.address, self._workspace = self._parse_address(address)
         self._heartbeat_interval = heartbeat_interval
 
         self._channel: Optional[grpc.Channel] = None
@@ -266,7 +267,42 @@ class OrchestratorClient:
             reconnect_interval=reconnect_interval,
         )
 
-        logger.debug(f"OrchestratorClient initialized for {address}")
+        if self._workspace:
+            logger.debug(f"OrchestratorClient initialized for {self.address} (workspace: {self._workspace})")
+        else:
+            logger.debug(f"OrchestratorClient initialized for {self.address}")
+
+    @staticmethod
+    def _parse_address(address: str) -> tuple[str, Optional[str]]:
+        """Parse address and workspace from connection string.
+
+        Supports formats:
+        - host:port           -> (host:port, None)
+        - host:port/workspace -> (host:port, workspace)
+
+        Parameters:
+            address: Connection string.
+
+        Returns:
+            Tuple of (host:port, workspace or None).
+        """
+        if "/" in address:
+            # Find the first / after the port
+            parts = address.split("/", 1)
+            server_addr = parts[0]
+            workspace = parts[1] if len(parts) > 1 else None
+            return server_addr, workspace
+        return address, None
+
+    def _get_grpc_metadata(self) -> Optional[List[tuple]]:
+        """Get gRPC metadata to include with requests.
+
+        Returns:
+            List of metadata tuples, or None if no metadata needed.
+        """
+        if self._workspace:
+            return [("workspace", self._workspace)]
+        return None
 
     def connect(self) -> None:
         """Connect to the orchestrator server."""
@@ -372,7 +408,7 @@ class OrchestratorClient:
 
         while True:
             try:
-                response = self._stub.Register(request)
+                response = self._stub.Register(request, metadata=self._get_grpc_metadata())
 
                 if not response.success:
                     raise RuntimeError(f"Registration rejected: {response.message}")
@@ -455,7 +491,7 @@ class OrchestratorClient:
                 memory_reserved=memory_reserved,
             )
             logger.debug(f"Sending CompleteMigration RPC for {process_id} -> {new_device} (gpu_uuid={gpu_uuid})")
-            response = self._stub.CompleteMigration(request)
+            response = self._stub.CompleteMigration(request, metadata=self._get_grpc_metadata())
             if response.success:
                 logger.debug(f"Notified orchestrator: migration complete to {new_device}")
             else:
@@ -482,7 +518,7 @@ class OrchestratorClient:
             return False
 
         request = pb2.UnregisterRequest(process_id=pid)
-        response = self._stub.Unregister(request)
+        response = self._stub.Unregister(request, metadata=self._get_grpc_metadata())
 
         if response.success:
             logger.info(f"Unregistered from orchestrator: {pid}")
@@ -502,7 +538,7 @@ class OrchestratorClient:
             self.connect()
 
         request = pb2.ListProcessesRequest(device_filter=device_filter)
-        response = self._stub.ListProcesses(request)
+        response = self._stub.ListProcesses(request, metadata=self._get_grpc_metadata())
 
         return [
             {
@@ -539,7 +575,7 @@ class OrchestratorClient:
             self.connect()
 
         request = pb2.GetProcessStatusRequest(process_id=process_id)
-        response = self._stub.GetProcessStatus(request)
+        response = self._stub.GetProcessStatus(request, metadata=self._get_grpc_metadata())
 
         if not response.found:
             return None
@@ -582,7 +618,7 @@ class OrchestratorClient:
             target_device=target_device,
         )
 
-        response = self._stub.Migrate(request)
+        response = self._stub.Migrate(request, metadata=self._get_grpc_metadata())
 
         if response.success:
             logger.info(f"Migration requested for {process_id} to {target_device}")
@@ -604,7 +640,7 @@ class OrchestratorClient:
             self.connect()
 
         request = pb2.GetDeviceStatusRequest(device=device)
-        response = self._stub.GetDeviceStatus(request)
+        response = self._stub.GetDeviceStatus(request, metadata=self._get_grpc_metadata())
 
         return [
             {
@@ -658,7 +694,7 @@ class OrchestratorClient:
                 current_gpu_uuid=current_gpu_uuid,
             )
 
-            response = self._stub.RequestErrorRecovery(request)
+            response = self._stub.RequestErrorRecovery(request, metadata=self._get_grpc_metadata())
 
             if response.success:
                 logger.info(
@@ -692,7 +728,7 @@ class OrchestratorClient:
 
         try:
             request = pb2.MarkGPUHealthyRequest(gpu_uuid=gpu_uuid)
-            response = self._stub.MarkGPUHealthy(request)
+            response = self._stub.MarkGPUHealthy(request, metadata=self._get_grpc_metadata())
             if response.success:
                 logger.info(f"Marked GPU {gpu_uuid[:12]}... as healthy")
             return response.success
@@ -711,7 +747,7 @@ class OrchestratorClient:
 
         try:
             request = pb2.GetUnhealthyGPUsRequest()
-            response = self._stub.GetUnhealthyGPUs(request)
+            response = self._stub.GetUnhealthyGPUs(request, metadata=self._get_grpc_metadata())
 
             return [
                 {
@@ -743,7 +779,7 @@ class OrchestratorClient:
 
         try:
             request = pb2.PauseRequest(process_id=process_id)
-            response = self._stub.Pause(request)
+            response = self._stub.Pause(request, metadata=self._get_grpc_metadata())
 
             result = {
                 "success": response.success,
@@ -791,7 +827,7 @@ class OrchestratorClient:
                 process_id=process_id,
                 target_device=target_device,
             )
-            response = self._stub.Resume(request)
+            response = self._stub.Resume(request, metadata=self._get_grpc_metadata())
 
             result = {
                 "success": response.success,

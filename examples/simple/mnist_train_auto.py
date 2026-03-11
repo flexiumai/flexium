@@ -71,7 +71,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="MNIST with transparent flexium")
     parser.add_argument(
         "--orchestrator",
-        default="localhost:50051",
+        default="localhost:50051/bar",
         help="Orchestrator address (e.g., localhost:50051). Use empty string for local mode.",
     )
     parser.add_argument(
