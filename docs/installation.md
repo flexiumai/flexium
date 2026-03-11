@@ -207,7 +207,7 @@ migratable: true
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GPU_ORCHESTRATOR` | Orchestrator address | None (local mode) |
+| `FLEXIUM_SERVER` | Server address with workspace (host:port/workspace) | None (local mode) |
 | `GPU_DEVICE` | Default GPU device | `cuda:0` |
 | `FLEXIUM_LOG_LEVEL` | Log level | `INFO` |
 | `FLEXIUM_DEBUG` | Enable debug mode | `false` |
@@ -215,10 +215,14 @@ migratable: true
 Example:
 
 ```bash
-export GPU_ORCHESTRATOR=192.168.1.100:50051
+# Format: host:port/workspace
+export FLEXIUM_SERVER="localhost:50051/myworkspace"
 export GPU_DEVICE=cuda:0
 export FLEXIUM_LOG_LEVEL=DEBUG
 ```
+
+!!! note "URL Format"
+    The `FLEXIUM_SERVER` variable uses a token-in-path format: `host:port/workspace`. This routes your training jobs to the correct workspace orchestrator.
 
 ### Project-Local Config
 
@@ -260,14 +264,11 @@ pynvml.nvmlShutdown()
 "
 ```
 
-### Step 3: Test Orchestrator
+### Step 3: Test Server Connection
 
 ```bash
-# Terminal 1: Start orchestrator
-flexium-ctl server --dashboard
-
-# Terminal 2: Check status
-flexium-ctl status
+# Set your server and workspace
+export FLEXIUM_SERVER="localhost:50051/myworkspace"
 ```
 
 ### Step 4: Test Training Integration
@@ -285,7 +286,7 @@ with flexium.auto.run():
 EOF
 
 # Run test
-GPU_ORCHESTRATOR=localhost:50051 python test_flexium.py
+FLEXIUM_SERVER="localhost:50051/myworkspace" python test_flexium.py
 ```
 
 ---

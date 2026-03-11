@@ -38,7 +38,6 @@ Core dependencies (installed automatically):
 - `grpcio>=1.50.0` - gRPC runtime
 - `protobuf>=4.0.0` - Protocol buffers
 - `pynvml>=11.0.0` - NVIDIA Management Library for GPU monitoring
-- `flask>=2.0.0` - Web dashboard
 
 Development dependencies:
 
@@ -47,18 +46,17 @@ Development dependencies:
 
 ## Quick Start
 
-### Step 1: Start the Orchestrator
+### Step 1: Connect to Flexium Server
 
-The orchestrator is the central server that coordinates GPU migrations.
+Flexium uses a cloud-based or self-hosted server architecture. Set the `FLEXIUM_SERVER` environment variable with your workspace:
 
 ```bash
-# Start with web dashboard
-flexium-ctl server --port 50051 --dashboard
-```
+# Format: host:port/workspace
+export FLEXIUM_SERVER="localhost:50051/myworkspace"
 
-This starts:
-- gRPC server on port 50051
-- Web dashboard at http://localhost:8080
+# Or for cloud:
+export FLEXIUM_SERVER="flexium.ai:50051/myworkspace"
+```
 
 ### Step 2: Add flexium to Your Training Script
 
@@ -101,8 +99,8 @@ That's it! Your training is now migration-enabled.
 ### Step 3: Run Your Training
 
 ```bash
-# Set orchestrator address
-export GPU_ORCHESTRATOR=localhost:50051
+# Set server address with workspace
+export FLEXIUM_SERVER="localhost:50051/myworkspace"
 
 # Run your script normally
 python train.py
@@ -110,44 +108,40 @@ python train.py
 
 ### Step 4: Monitor and Migrate
 
-Open the dashboard at http://localhost:8080 to:
+Open your workspace dashboard to:
 
 - See all running training jobs
 - Monitor GPU utilization
 - Trigger migrations with one click
+- Pause and resume training jobs
 
-Or use the CLI:
-
-```bash
-# List all processes
-flexium-ctl list
-
-# Migrate a process to a different GPU
-flexium-ctl migrate gpu-abc123 cuda:1
-```
+For self-hosted servers, the dashboard is at `http://localhost:8080/workspace/myworkspace`
 
 ## Configuration
+
+### Environment Variables (Recommended)
+
+```bash
+# Server with workspace (required)
+export FLEXIUM_SERVER="localhost:50051/myworkspace"
+
+# Optional: default device
+export GPU_DEVICE=cuda:0
+```
 
 ### Config File
 
 Create `~/.flexiumrc`:
 
 ```yaml
-orchestrator: localhost:50051
+server: localhost:50051/myworkspace
 device: cuda:0
-```
-
-### Environment Variables
-
-```bash
-export GPU_ORCHESTRATOR=localhost:50051
-export GPU_DEVICE=cuda:0
 ```
 
 ### Inline Parameters
 
 ```python
-with flexium.auto.run(orchestrator="localhost:50051", device="cuda:0"):
+with flexium.auto.run(orchestrator="localhost:50051/myworkspace", device="cuda:0"):
     ...
 ```
 
@@ -168,9 +162,9 @@ python -c "import flexium; print('OK')"
 
 ### Test Migration
 
-1. Start orchestrator:
+1. Set your server connection:
    ```bash
-   flexium-ctl server --dashboard
+   export FLEXIUM_SERVER="localhost:50051/myworkspace"
    ```
 
 2. Run example:
@@ -178,13 +172,21 @@ python -c "import flexium; print('OK')"
    python examples/simple/mnist_train_auto.py
    ```
 
-3. Open http://localhost:8080
+3. Open your workspace dashboard
 
 4. Click "Migrate" to move training to another GPU
 
 5. Watch training continue seamlessly!
 
 6. Verify zero residue with `nvidia-smi` - source GPU should show 0 MB for flexium process
+
+## Server Reconnection
+
+Flexium automatically reconnects if the server restarts:
+
+- On connection loss, you'll see: `[flexium] Lost connection to orchestrator, attempting reconnect...`
+- On successful reconnection: `[flexium] Reconnected to orchestrator!`
+- Training continues uninterrupted during brief server outages
 
 ## Next Steps
 
