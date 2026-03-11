@@ -1,0 +1,21 @@
+/* Custom styles for Flexium documentation */
+
+:root {
+  --md-primary-fg-color: #3f51b5;
+  --md-accent-fg-color: #009688;
+}
+
+/* Code block styling */
+.highlight code {
+  font-size: 0.85em;
+}
+
+/* Table styling */
+.md-typeset table:not([class]) {
+  font-size: 0.85em;
+}
+
+/* Admonition styling */
+.md-typeset .admonition {
+  font-size: 0.9em;
+}
