@@ -241,7 +241,7 @@ Command-line tools:
 
 For more information:
 
-- [Getting Started](docs/getting-started.md)
-- [API Reference](docs/api.md)
-- [Examples](docs/examples.md)
-- [Troubleshooting](docs/troubleshooting.md)
+- [Getting Started](getting-started.md)
+- [API Reference](api.md)
+- [Examples](examples.md)
+- [Troubleshooting](troubleshooting.md)
