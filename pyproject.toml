@@ -135,3 +135,21 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["flexium"]
+omit = [
+    "flexium/proto/*_pb2.py",
+    "flexium/proto/*_pb2_grpc.py",
+    "flexium/cli/*",
+    "flexium/dashboard/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
