@@ -405,10 +405,11 @@ class OrchestratorClient:
 
         self.connection_manager.start_connecting()
         logger.debug(f"Attempting to register {process_id} at {self.address}")
+        grpc_metadata = self._get_grpc_metadata()
 
         while True:
             try:
-                response = self._stub.Register(request, metadata=self._get_grpc_metadata())
+                response = self._stub.Register(request, metadata=grpc_metadata)
 
                 if not response.success:
                     raise RuntimeError(f"Registration rejected: {response.message}")

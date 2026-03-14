@@ -26,7 +26,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from flexium.utils.logging import get_logger
 
@@ -776,6 +776,8 @@ def get_all_device_reports(hostname: str) -> List[Dict[str, Any]]:
     Collects detailed information about ALL devices on this host,
     including memory usage, utilization, temperature, and power for GPUs.
     This ignores CUDA_VISIBLE_DEVICES to report the full system state.
+
+    In mock GPU mode (FLEXIUM_MOCK_GPUS=N), returns mock GPU reports.
 
     Parameters:
         hostname: Hostname to include in each report.

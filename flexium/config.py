@@ -19,7 +19,7 @@ from flexium.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Environment variable names
-ENV_ORCHESTRATOR = "GPU_ORCHESTRATOR"
+ENV_ORCHESTRATOR = "FLEXIUM_SERVER"
 ENV_DEVICE = "GPU_DEVICE"
 
 # Config file names (in priority order)
@@ -141,7 +141,7 @@ def load_config(
 
     Priority (highest to lowest):
     1. Inline parameters passed to this function
-    2. Environment variables (GPU_ORCHESTRATOR, GPU_DEVICE)
+    2. Environment variables (FLEXIUM_SERVER, GPU_DEVICE)
     3. Config file (~/.flexiumrc or ./.flexiumrc)
     4. Defaults
 
@@ -192,7 +192,7 @@ def print_no_orchestrator_warning() -> None:
 [flexium] Running in local mode (no migration support)
 [flexium]
 [flexium] To enable orchestrator, either:
-[flexium]   - Set GPU_ORCHESTRATOR=host:port environment variable
+[flexium]   - Set FLEXIUM_SERVER=host:port/workspace environment variable
 [flexium]   - Create ~/.flexiumrc with: orchestrator: host:port
 [flexium]   - Pass orchestrator='host:port' to run()
 ============================================================

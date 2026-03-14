@@ -18,7 +18,7 @@ Just add one import and wrap your training in `run()`:
 
 Configuration priority:
 1. Inline parameters to run()
-2. Environment variables (GPU_ORCHESTRATOR, GPU_DEVICE)
+2. Environment variables (FLEXIUM_SERVER, GPU_DEVICE)
 3. Config file (~/.flexiumrc or ./.flexiumrc)
 4. Defaults (local mode with warning)
 
@@ -1047,18 +1047,24 @@ def _send_heartbeat() -> None:
                     # Count this as another failure
                     cm.on_failure(e)
 
-            elif cm.should_attempt_reconnect():
-                # In local mode - try periodic reconnect
-                print(f"[flexium] Attempting reconnection to orchestrator...")
-                sys.stdout.flush()
-                cm.reset_for_reconnect()
-                if _attempt_reconnect():
-                    print(f"[flexium] Reconnected to orchestrator!")
+            elif cm.state == ConnectionState.LOCAL_MODE:
+                # In local mode - check if time to reconnect
+                if cm.should_attempt_reconnect():
+                    print(f"[flexium] Attempting reconnection to orchestrator...")
                     sys.stdout.flush()
-                else:
-                    cm.on_failure(e)
+                    cm.reset_for_reconnect()
+                    if _attempt_reconnect():
+                        print(f"[flexium] Reconnected to orchestrator!")
+                        sys.stdout.flush()
+                    else:
+                        cm.on_failure(e)
+                # else: silently skip - not time to reconnect yet
+            else:
+                # Unknown state - log for debugging
+                logger.debug(f"Heartbeat error in unexpected state {cm.state}: {e}")
     except Exception as e:
-        logger.debug(f"Heartbeat error: {e}")
+        # Non-gRPC error - log it
+        logger.warning(f"Heartbeat non-gRPC error: {e}")
 
 
 def _heartbeat_loop() -> None:
@@ -1130,7 +1136,8 @@ def _attempt_reconnect() -> bool:
             return False
 
     except Exception as e:
-        logger.debug(f"Reconnection failed: {e}")
+        print(f"[flexium] Reconnection failed: {e}")
+        sys.stdout.flush()
         return False
 
 
@@ -1201,12 +1208,13 @@ def _connect_orchestrator(config: FlexiumConfig) -> None:
         if result:
             print(f"[flexium] Registered with orchestrator")
         else:
-            print(f"[flexium] WARNING: Registration failed, local mode")
-            _orchestrator_client = None
+            # Keep client alive for reconnection attempts
+            print(f"[flexium] WARNING: Registration failed, will retry periodically")
 
     except Exception as e:
         logger.error(f"Failed to connect to orchestrator: {e}")
-        _orchestrator_client = None
+        # Keep client alive for reconnection attempts if it was created
+        # _orchestrator_client stays as-is (may be None or valid)
 
 
 def _disconnect_orchestrator() -> None:

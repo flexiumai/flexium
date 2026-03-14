@@ -19,7 +19,7 @@ Usage:
                 optimizer.step()
 
 Configuration:
-    - Set GPU_ORCHESTRATOR environment variable to orchestrator address
+    - Set FLEXIUM_SERVER environment variable to server address (host:port/workspace)
     - Or pass orchestrator= parameter to flexium.auto.run()
 
 Migration is transparent - training continues in the same process,

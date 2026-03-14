@@ -8,7 +8,7 @@ Compare with mnist_train.py which uses the explicit API.
 
 Usage:
     # With orchestrator (set via env or config file)
-    export GPU_ORCHESTRATOR=localhost:50051
+    export FLEXIUM_SERVER=localhost:50051/workspace
     python examples/mnist_train_auto.py
 
     # With orchestrator (inline)
@@ -71,8 +71,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="MNIST with transparent flexium")
     parser.add_argument(
         "--orchestrator",
-        default="localhost:50051/bar",
-        help="Orchestrator address (e.g., localhost:50051). Use empty string for local mode.",
+        default=None,
+        help="Orchestrator address (e.g., localhost:50051/workspace). Uses FLEXIUM_SERVER env var if not set.",
     )
     parser.add_argument(
         "--device",
