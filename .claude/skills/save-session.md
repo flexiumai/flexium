@@ -58,3 +58,5 @@ When the user invokes `/save-session`, do the following:
 6. **Update CLAUDE.md**: Update `/home/e155809/views/flexium_project/flexium-server/CLAUDE.md` - add new keywords to the Session Index table, mapping keywords to session file paths.
 
 7. **Confirm**: Show the user what was saved and the updated keyword index.
+
+8. **Ask about pushing**: Ask the user if they want to commit and push the session files to git. If yes, commit with message format: `docs: Add <session-description> session` and push.
