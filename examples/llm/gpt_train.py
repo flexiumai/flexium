@@ -10,7 +10,7 @@ Usage:
     python gpt_train.py
 
     # With orchestrator
-    python gpt_train.py --orchestrator localhost:50051
+    python gpt_train.py --orchestrator localhost:80
 
     # Without flexium (baseline)
     python gpt_train.py --disabled
@@ -242,8 +242,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="GPT training with flexium")
     parser.add_argument(
         "--orchestrator",
-        default="localhost:50051",
-        help="Orchestrator address (e.g., localhost:50051). Use empty string for local mode.",
+        default="localhost:80",
+        help="Orchestrator address (e.g., localhost:80). Use empty string for local mode.",
     )
     parser.add_argument(
         "--device",

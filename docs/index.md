@@ -195,7 +195,7 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 │              (Central server, can be remote)                        │
 │   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐    │
 │   │ gRPC Server │  │  Registry   │  │    Web Dashboard        │    │
-│   │   :50051    │  │             │  │       :8080             │    │
+│   │   :80    │  │             │  │       :8080             │    │
 │   └─────────────┘  └─────────────┘  └─────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
                               │

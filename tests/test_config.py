@@ -41,7 +41,7 @@ class TestFlexiumConfig:
     def test_custom_values(self) -> None:
         """Test configuration with custom values."""
         config = FlexiumConfig(
-            orchestrator="localhost:50051",
+            orchestrator="localhost:80",
             device="cuda:1",
             checkpoint_dir="/custom/checkpoints",
             heartbeat_interval=5.0,
@@ -54,7 +54,7 @@ class TestFlexiumConfig:
             migratable=False,
         )
 
-        assert config.orchestrator == "localhost:50051"
+        assert config.orchestrator == "localhost:80"
         assert config.device == "cuda:1"
         assert config.checkpoint_dir == "/custom/checkpoints"
         assert config.heartbeat_interval == 5.0
@@ -69,13 +69,13 @@ class TestFlexiumConfig:
     def test_from_dict(self) -> None:
         """Test creating config from dictionary."""
         data = {
-            "orchestrator": "server:50051",
+            "orchestrator": "server:80",
             "device": "cuda:2",
             "priority": 90,
         }
         config = FlexiumConfig.from_dict(data)
 
-        assert config.orchestrator == "server:50051"
+        assert config.orchestrator == "server:80"
         assert config.device == "cuda:2"
         assert config.priority == 90
         # Defaults for unspecified values
@@ -84,13 +84,13 @@ class TestFlexiumConfig:
     def test_from_dict_ignores_unknown_keys(self) -> None:
         """Test that from_dict ignores unknown keys."""
         data = {
-            "orchestrator": "server:50051",
+            "orchestrator": "server:80",
             "unknown_key": "should be ignored",
             "another_unknown": 123,
         }
         # Should not raise
         config = FlexiumConfig.from_dict(data)
-        assert config.orchestrator == "server:50051"
+        assert config.orchestrator == "server:80"
         assert not hasattr(config, "unknown_key")
 
     def test_from_dict_empty(self) -> None:
@@ -107,7 +107,7 @@ class TestFindConfigFile:
     def test_finds_project_local_config(self, tmp_path: Path) -> None:
         """Test finding project-local config file."""
         config_file = tmp_path / ".flexiumrc"
-        config_file.write_text("orchestrator: localhost:50051")
+        config_file.write_text("orchestrator: localhost:80")
 
         with patch("flexium.config.Path.cwd", return_value=tmp_path):
             result = _find_config_file()
@@ -127,11 +127,11 @@ class TestLoadYamlFile:
     def test_loads_valid_yaml(self, tmp_path: Path) -> None:
         """Test loading a valid YAML file."""
         config_file = tmp_path / "config.yaml"
-        config_file.write_text("orchestrator: localhost:50051\ndevice: cuda:1")
+        config_file.write_text("orchestrator: localhost:80\ndevice: cuda:1")
 
         result = _load_yaml_file(config_file)
 
-        assert result["orchestrator"] == "localhost:50051"
+        assert result["orchestrator"] == "localhost:80"
         assert result["device"] == "cuda:1"
 
     def test_returns_empty_dict_for_invalid_yaml(self, tmp_path: Path) -> None:
@@ -172,75 +172,75 @@ class TestLoadConfig:
         """Test that inline parameters override everything else."""
         with patch("flexium.config._find_config_file", return_value=None):
             with patch.dict(os.environ, {
-                ENV_ORCHESTRATOR: "env-server:50051",
+                ENV_ORCHESTRATOR: "env-server:80",
                 ENV_DEVICE: "cuda:5",
             }):
                 config = load_config(
-                    orchestrator="inline-server:50051",
+                    orchestrator="inline-server:80",
                     device="cuda:7",
                 )
 
-        assert config.orchestrator == "inline-server:50051"
+        assert config.orchestrator == "inline-server:80"
         assert config.device == "cuda:7"
 
     def test_env_vars_override_file(self, tmp_path: Path) -> None:
         """Test that environment variables override config file."""
         config_file = tmp_path / ".flexiumrc"
-        config_file.write_text("orchestrator: file-server:50051\ndevice: cuda:1")
+        config_file.write_text("orchestrator: file-server:80\ndevice: cuda:1")
 
         with patch("flexium.config._find_config_file", return_value=config_file):
             with patch.dict(os.environ, {
-                ENV_ORCHESTRATOR: "env-server:50051",
+                ENV_ORCHESTRATOR: "env-server:80",
                 ENV_DEVICE: "cuda:5",
             }):
                 config = load_config()
 
-        assert config.orchestrator == "env-server:50051"
+        assert config.orchestrator == "env-server:80"
         assert config.device == "cuda:5"
 
     def test_file_config_used_when_no_env_or_inline(self, tmp_path: Path) -> None:
         """Test that file config is used when no env vars or inline params."""
         config_file = tmp_path / ".flexiumrc"
-        config_file.write_text("orchestrator: file-server:50051\ndevice: cuda:3")
+        config_file.write_text("orchestrator: file-server:80\ndevice: cuda:3")
 
         with patch("flexium.config._find_config_file", return_value=config_file):
             with patch.dict(os.environ, {}, clear=True):
                 config = load_config()
 
-        assert config.orchestrator == "file-server:50051"
+        assert config.orchestrator == "file-server:80"
         assert config.device == "cuda:3"
 
     def test_partial_env_override(self, tmp_path: Path) -> None:
         """Test partial override with environment variables."""
         config_file = tmp_path / ".flexiumrc"
-        config_file.write_text("orchestrator: file-server:50051\ndevice: cuda:1")
+        config_file.write_text("orchestrator: file-server:80\ndevice: cuda:1")
 
         with patch("flexium.config._find_config_file", return_value=config_file):
             with patch.dict(os.environ, {ENV_DEVICE: "cuda:9"}, clear=True):
                 config = load_config()
 
         # orchestrator from file, device from env
-        assert config.orchestrator == "file-server:50051"
+        assert config.orchestrator == "file-server:80"
         assert config.device == "cuda:9"
 
     def test_partial_inline_override(self) -> None:
         """Test partial override with inline parameters."""
         with patch("flexium.config._find_config_file", return_value=None):
             with patch.dict(os.environ, {
-                ENV_ORCHESTRATOR: "env-server:50051",
+                ENV_ORCHESTRATOR: "env-server:80",
                 ENV_DEVICE: "cuda:5",
             }):
                 # Only override device, orchestrator from env
                 config = load_config(device="cuda:0")
 
-        assert config.orchestrator == "env-server:50051"
+        assert config.orchestrator == "env-server:80"
         assert config.device == "cuda:0"
 
     def test_none_inline_does_not_override(self) -> None:
         """Test that None inline params don't override."""
         with patch("flexium.config._find_config_file", return_value=None):
-            with patch.dict(os.environ, {ENV_ORCHESTRATOR: "env-server:50051"}):
+            with patch.dict(os.environ, {ENV_ORCHESTRATOR: "env-server:80"}):
                 config = load_config(orchestrator=None)
 
         # Should keep env value
-        assert config.orchestrator == "env-server:50051"
+        assert config.orchestrator == "env-server:80"

@@ -34,19 +34,19 @@ Common issues and their solutions when using flexium.
 2. **Verify port is correct:**
    ```bash
    # Check what port orchestrator is on
-   netstat -tlnp | grep 50051
+   netstat -tlnp | grep 80
    ```
 
 3. **Check network connectivity:**
    ```bash
    # Test connection
-   nc -zv localhost 50051
+   nc -zv localhost 80
    ```
 
 4. **Check firewall:**
    ```bash
    # Allow port if needed
-   sudo ufw allow 50051
+   sudo ufw allow 80
    ```
 
 5. **Try explicit address:**
@@ -55,7 +55,7 @@ Common issues and their solutions when using flexium.
    with flexium.auto.run():
 
    # Try
-   with flexium.auto.run(orchestrator="127.0.0.1:50051"):
+   with flexium.auto.run(orchestrator="127.0.0.1:80"):
    ```
 
 ### Training process issues
@@ -289,7 +289,7 @@ This shouldn't happen with Flexium.AI's architecture. If it does:
 
 1. **Check orchestrator is connected:**
    ```python
-   with flexium.auto.run(orchestrator="localhost:50051"):
+   with flexium.auto.run(orchestrator="localhost:80"):
        ...
    ```
    When connected to orchestrator, you can migrate to a GPU with more VRAM.
@@ -485,13 +485,13 @@ PRODUCTION=1 python train.py  # Bypasses flexium
 
 A: Yes! Just specify the address:
 ```python
-with flexium.auto.run(orchestrator="192.168.1.100:50051"):
+with flexium.auto.run(orchestrator="192.168.1.100:80"):
     ...
 ```
 
 Or via environment:
 ```bash
-export GPU_ORCHESTRATOR=192.168.1.100:50051
+export GPU_ORCHESTRATOR=192.168.1.100:80
 ```
 
 ---

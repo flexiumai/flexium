@@ -184,7 +184,7 @@ Create `~/.flexiumrc`:
 
 ```yaml
 # Orchestrator address
-orchestrator: localhost:50051
+orchestrator: localhost:80
 
 # Default device
 device: cuda:0
@@ -216,7 +216,7 @@ Example:
 
 ```bash
 # Format: host:port/workspace
-export FLEXIUM_SERVER="localhost:50051/myworkspace"
+export FLEXIUM_SERVER="localhost:80/myworkspace"
 export GPU_DEVICE=cuda:0
 export FLEXIUM_LOG_LEVEL=DEBUG
 ```
@@ -229,7 +229,7 @@ export FLEXIUM_LOG_LEVEL=DEBUG
 Create `.flexiumrc` in your project directory (takes precedence over `~/.flexiumrc`):
 
 ```yaml
-orchestrator: localhost:50051
+orchestrator: localhost:80
 device: cuda:0
 ```
 
@@ -268,7 +268,7 @@ pynvml.nvmlShutdown()
 
 ```bash
 # Set your server and workspace
-export FLEXIUM_SERVER="localhost:50051/myworkspace"
+export FLEXIUM_SERVER="localhost:80/myworkspace"
 ```
 
 ### Step 4: Test Training Integration
@@ -286,7 +286,7 @@ with flexium.auto.run():
 EOF
 
 # Run test
-FLEXIUM_SERVER="localhost:50051/myworkspace" python test_flexium.py
+FLEXIUM_SERVER="localhost:80/myworkspace" python test_flexium.py
 ```
 
 ---
@@ -360,7 +360,7 @@ newgrp video
 docker pull flexium/orchestrator:latest
 
 # Run orchestrator
-docker run -d -p 50051:50051 -p 8080:8080 flexium/orchestrator
+docker run -d -p 80:80 -p 8080:8080 flexium/orchestrator
 ```
 
 ### Building from Source
@@ -370,7 +370,7 @@ docker run -d -p 50051:50051 -p 8080:8080 flexium/orchestrator
 docker build -t flexium:local .
 
 # Run
-docker run --gpus all -p 50051:50051 -p 8080:8080 flexium:local
+docker run --gpus all -p 80:80 -p 8080:8080 flexium:local
 ```
 
 ---

@@ -24,7 +24,7 @@ We will acknowledge receipt within 48 hours and provide a detailed response with
 
 ### Network Security
 
-- The orchestrator listens on gRPC port 50051 by default
+- The orchestrator listens on gRPC port 80 by default
 - The dashboard listens on HTTP port 8080 by default
 - Consider running behind a firewall or VPN in production
 - No built-in authentication (rely on network security)

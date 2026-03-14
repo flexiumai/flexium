@@ -33,7 +33,7 @@ Flexium is a GPU orchestration system that enables **live GPU migration** for Py
 │                    ORCHESTRATOR SERVER                                   │
 │  ┌──────────────┐  ┌───────────────┐  ┌─────────────────────────────┐  │
 │  │ gRPC Server  │  │ Process       │  │ Device Registry             │  │
-│  │ :50051       │  │ Registry      │  │ (tracks GPU health/usage)   │  │
+│  │ :80       │  │ Registry      │  │ (tracks GPU health/usage)   │  │
 │  └──────────────┘  └───────────────┘  └─────────────────────────────┘  │
 │         │                                                               │
 │  ┌──────────────────────────────────────────────────────────────────┐  │

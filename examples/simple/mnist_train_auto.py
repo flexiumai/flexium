@@ -8,11 +8,11 @@ Compare with mnist_train.py which uses the explicit API.
 
 Usage:
     # With orchestrator (set via env or config file)
-    export FLEXIUM_SERVER=localhost:50051/workspace
+    export FLEXIUM_SERVER=localhost:80/workspace
     python examples/mnist_train_auto.py
 
     # With orchestrator (inline)
-    python examples/mnist_train_auto.py --orchestrator localhost:50051
+    python examples/mnist_train_auto.py --orchestrator localhost:80
 
     # Baseline benchmark (no flexium - good for PyCharm debugging)
     python examples/mnist_train_auto.py --disabled
@@ -72,7 +72,7 @@ def main() -> None:
     parser.add_argument(
         "--orchestrator",
         default=None,
-        help="Orchestrator address (e.g., localhost:50051/workspace). Uses FLEXIUM_SERVER env var if not set.",
+        help="Orchestrator address (e.g., localhost:80/workspace). Uses FLEXIUM_SERVER env var if not set.",
     )
     parser.add_argument(
         "--device",

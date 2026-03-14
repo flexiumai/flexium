@@ -379,7 +379,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="orchestrator:50051"):
+    with flexium.auto.run(orchestrator="orchestrator:80"):
         model = BigModel().cuda()
 
         for epoch in range(1000):
@@ -580,7 +580,7 @@ from flexium.lightning import FlexiumCallback
 
 # Just add the callback - that's it!
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="localhost:50051")],
+    callbacks=[FlexiumCallback(orchestrator="localhost:80")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -678,7 +678,7 @@ trainer.fit(model, dataloader)
 
         # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
         flexium_callback = FlexiumCallback(
-            orchestrator="localhost:50051",  # Or use GPU_ORCHESTRATOR env var
+            orchestrator="localhost:80",  # Or use GPU_ORCHESTRATOR env var
         )
 
         # Create trainer with Flexium callback
@@ -707,7 +707,7 @@ flexium-ctl server --dashboard
 python examples/lightning/mnist_lightning.py
 
 # With custom settings
-python examples/lightning/mnist_lightning.py --orchestrator localhost:50051 --epochs 5
+python examples/lightning/mnist_lightning.py --orchestrator localhost:80 --epochs 5
 
 # Baseline (no flexium)
 python examples/lightning/mnist_lightning.py --disabled
@@ -720,7 +720,7 @@ python examples/lightning/mnist_lightning.py --disabled
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="localhost:50051"):
+    with flexium.auto.run(orchestrator="localhost:80"):
         model = Net().cuda()
         optimizer = torch.optim.Adam(model.parameters())
 
@@ -736,7 +736,7 @@ python examples/lightning/mnist_lightning.py --disabled
     from flexium.lightning import FlexiumCallback
 
     trainer = Trainer(
-        callbacks=[FlexiumCallback(orchestrator="localhost:50051")],
+        callbacks=[FlexiumCallback(orchestrator="localhost:80")],
         max_epochs=10,
         accelerator="gpu",
         devices=1,
@@ -858,7 +858,7 @@ Run multiple training jobs and migrate between them:
 # job1.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="orchestrator:50051"):
+with flexium.auto.run(orchestrator="orchestrator:80"):
     # Training job 1
     model1 = Model1().cuda()
     train(model1)
@@ -866,7 +866,7 @@ with flexium.auto.run(orchestrator="orchestrator:50051"):
 # job2.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="orchestrator:50051"):
+with flexium.auto.run(orchestrator="orchestrator:80"):
     # Training job 2
     model2 = Model2().cuda()
     train(model2)
@@ -901,7 +901,7 @@ flexium-ctl migrate job2-process-id cuda:1
 
 
     def train():
-        with flexium.auto.run(orchestrator="prod-orchestrator:50051"):
+        with flexium.auto.run(orchestrator="prod-orchestrator:80"):
             model = MyModel().cuda()
             optimizer = torch.optim.Adam(model.parameters())
 
@@ -1865,7 +1865,7 @@ flexium-ctl server --dashboard
 python examples/simple/mnist_train_auto.py
 
 # Run with custom settings
-python examples/simple/mnist_train_auto.py --orchestrator localhost:50051 --epochs 5
+python examples/simple/mnist_train_auto.py --orchestrator localhost:80 --epochs 5
 
 # Run without flexium (baseline)
 python examples/simple/mnist_train_auto.py --disabled

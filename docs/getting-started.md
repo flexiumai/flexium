@@ -52,10 +52,10 @@ Flexium uses a cloud-based or self-hosted server architecture. Set the `FLEXIUM_
 
 ```bash
 # Format: host:port/workspace
-export FLEXIUM_SERVER="localhost:50051/myworkspace"
+export FLEXIUM_SERVER="localhost:80/myworkspace"
 
 # Or for cloud:
-export FLEXIUM_SERVER="flexium.ai:50051/myworkspace"
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 ```
 
 ### Step 2: Add flexium to Your Training Script
@@ -100,7 +100,7 @@ That's it! Your training is now migration-enabled.
 
 ```bash
 # Set server address with workspace
-export FLEXIUM_SERVER="localhost:50051/myworkspace"
+export FLEXIUM_SERVER="localhost:80/myworkspace"
 
 # Run your script normally
 python train.py
@@ -123,7 +123,7 @@ For self-hosted servers, the dashboard is at `http://localhost:8080/workspace/my
 
 ```bash
 # Server with workspace (required)
-export FLEXIUM_SERVER="localhost:50051/myworkspace"
+export FLEXIUM_SERVER="localhost:80/myworkspace"
 
 # Optional: default device
 export GPU_DEVICE=cuda:0
@@ -134,14 +134,14 @@ export GPU_DEVICE=cuda:0
 Create `~/.flexiumrc`:
 
 ```yaml
-server: localhost:50051/myworkspace
+server: localhost:80/myworkspace
 device: cuda:0
 ```
 
 ### Inline Parameters
 
 ```python
-with flexium.auto.run(orchestrator="localhost:50051/myworkspace", device="cuda:0"):
+with flexium.auto.run(orchestrator="localhost:80/myworkspace", device="cuda:0"):
     ...
 ```
 
@@ -164,7 +164,7 @@ python -c "import flexium; print('OK')"
 
 1. Set your server connection:
    ```bash
-   export FLEXIUM_SERVER="localhost:50051/myworkspace"
+   export FLEXIUM_SERVER="localhost:80/myworkspace"
    ```
 
 2. Run example:

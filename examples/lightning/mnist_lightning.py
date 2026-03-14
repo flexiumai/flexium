@@ -9,11 +9,11 @@ Compare with examples/simple/mnist_train_auto.py which uses raw PyTorch.
 
 Usage:
     # With orchestrator
-    export GPU_ORCHESTRATOR=localhost:50051
+    export GPU_ORCHESTRATOR=localhost:80
     python examples/lightning/mnist_lightning.py
 
     # With orchestrator (inline)
-    python examples/lightning/mnist_lightning.py --orchestrator localhost:50051
+    python examples/lightning/mnist_lightning.py --orchestrator localhost:80
 
     # Baseline benchmark (no flexium - good for debugging)
     python examples/lightning/mnist_lightning.py --disabled
@@ -157,8 +157,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--orchestrator",
-        default="localhost:50051",
-        help="Orchestrator address (e.g., localhost:50051)",
+        default="localhost:80",
+        help="Orchestrator address (e.g., localhost:80)",
     )
     parser.add_argument(
         "--device",

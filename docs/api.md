@@ -84,7 +84,7 @@ with flexium.auto.run():
 
 **With orchestrator:**
 ```python
-with flexium.auto.run(orchestrator="localhost:50051"):
+with flexium.auto.run(orchestrator="localhost:80"):
     model = Net().cuda()
 ```
 
@@ -103,7 +103,7 @@ with flexium.auto.run(disabled=True):
 
 **Environment variables:**
 ```bash
-export GPU_ORCHESTRATOR=localhost:50051
+export GPU_ORCHESTRATOR=localhost:80
 export GPU_DEVICE=cuda:1
 python train.py
 ```
@@ -294,7 +294,7 @@ class MyModel(LightningModule):
     ...
 
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="localhost:50051")],
+    callbacks=[FlexiumCallback(orchestrator="localhost:80")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -312,7 +312,7 @@ For more details, see [Lightning Integration](features/lightning-integration.md)
 
 ```yaml
 # ~/.flexiumrc or ./.flexiumrc
-orchestrator: localhost:50051
+orchestrator: localhost:80
 device: cuda:0
 ```
 
@@ -320,7 +320,7 @@ device: cuda:0
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GPU_ORCHESTRATOR` | Orchestrator address | `localhost:50051` |
+| `GPU_ORCHESTRATOR` | Orchestrator address | `localhost:80` |
 | `GPU_DEVICE` | Initial device | `cuda:0` |
 | `FLEXIUM_LOG_LEVEL` | Logging level | `DEBUG` |
 
@@ -333,10 +333,10 @@ from flexium.config import load_config
 config = load_config()
 
 # Override specific values
-config = load_config(orchestrator="myserver:50051", device="cuda:2")
+config = load_config(orchestrator="myserver:80", device="cuda:2")
 
 # Access values
-print(config.orchestrator)  # "myserver:50051"
+print(config.orchestrator)  # "myserver:80"
 print(config.device)        # "cuda:2"
 ```
 
@@ -357,7 +357,7 @@ Options:
 
 **Examples:**
 ```bash
-flexium-ctl server                    # Port 50051, no dashboard
+flexium-ctl server                    # Port 80, no dashboard
 flexium-ctl server 50052              # Custom port
 flexium-ctl server --dashboard        # With dashboard at :8080
 flexium-ctl server --dashboard --dashboard-port 9000
@@ -429,7 +429,7 @@ For programmatic control of the orchestrator.
 ```python
 from flexium.orchestrator.client import OrchestratorClient
 
-client = OrchestratorClient("localhost:50051")
+client = OrchestratorClient("localhost:80")
 ```
 
 ### Methods
@@ -463,7 +463,7 @@ def resume(process_id: str, target_device: Optional[str] = None) -> bool:
 ```python
 from flexium.orchestrator.client import OrchestratorClient
 
-client = OrchestratorClient("localhost:50051")
+client = OrchestratorClient("localhost:80")
 
 # List all processes
 processes = client.list_processes()

@@ -1539,7 +1539,7 @@ class TestConnectOrchestrator:
 
         try:
             config = FlexiumConfig(
-                orchestrator="localhost:50051",
+                orchestrator="localhost:80",
                 device="cuda:0",
             )
 

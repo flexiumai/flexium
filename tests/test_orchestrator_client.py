@@ -681,54 +681,54 @@ class TestOrchestratorClientUnit:
         """Test _parse_address with simple host:port."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        addr, workspace = OrchestratorClient._parse_address("localhost:50051")
-        assert addr == "localhost:50051"
+        addr, workspace = OrchestratorClient._parse_address("localhost:80")
+        assert addr == "localhost:80"
         assert workspace is None
 
     def test_parse_address_with_workspace(self) -> None:
         """Test _parse_address with workspace suffix."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        addr, workspace = OrchestratorClient._parse_address("localhost:50051/my-workspace")
-        assert addr == "localhost:50051"
+        addr, workspace = OrchestratorClient._parse_address("localhost:80/my-workspace")
+        assert addr == "localhost:80"
         assert workspace == "my-workspace"
 
     def test_parse_address_with_nested_workspace(self) -> None:
         """Test _parse_address with nested workspace path."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        addr, workspace = OrchestratorClient._parse_address("localhost:50051/team/project")
-        assert addr == "localhost:50051"
+        addr, workspace = OrchestratorClient._parse_address("localhost:80/team/project")
+        assert addr == "localhost:80"
         assert workspace == "team/project"
 
     def test_client_initialization(self) -> None:
         """Test OrchestratorClient initializes correctly."""
         from flexium.orchestrator.client import OrchestratorClient, ConnectionState
 
-        client = OrchestratorClient("localhost:50051")
-        assert client.address == "localhost:50051"
+        client = OrchestratorClient("localhost:80")
+        assert client.address == "localhost:80"
         assert client.connection_manager.state == ConnectionState.DISCONNECTED
 
     def test_client_initialization_with_workspace(self) -> None:
         """Test OrchestratorClient initializes with workspace."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051/test-workspace")
-        assert client.address == "localhost:50051"
+        client = OrchestratorClient("localhost:80/test-workspace")
+        assert client.address == "localhost:80"
         assert client._workspace == "test-workspace"
 
     def test_get_grpc_metadata_without_workspace(self) -> None:
         """Test _get_grpc_metadata returns None without workspace."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         assert client._get_grpc_metadata() is None
 
     def test_get_grpc_metadata_with_workspace(self) -> None:
         """Test _get_grpc_metadata returns workspace metadata."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051/my-workspace")
+        client = OrchestratorClient("localhost:80/my-workspace")
         metadata = client._get_grpc_metadata()
         assert metadata == [("workspace", "my-workspace")]
 
@@ -736,7 +736,7 @@ class TestOrchestratorClientUnit:
         """Test update_device updates internal state."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._current_device = "cuda:0"
 
         client.update_device("cuda:1")
@@ -746,7 +746,7 @@ class TestOrchestratorClientUnit:
         """Test disconnect works even if not connected."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         # Should not raise
         client.disconnect()
         assert client._channel is None
@@ -756,7 +756,7 @@ class TestOrchestratorClientUnit:
         """Test unregister returns False without connection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         result = client.unregister("test-process")
         assert result is False
 
@@ -764,7 +764,7 @@ class TestOrchestratorClientUnit:
         """Test unregister returns False without process_id."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()  # Fake stub
         result = client.unregister()  # No process_id
         assert result is False
@@ -773,7 +773,7 @@ class TestOrchestratorClientUnit:
         """Test complete_migration returns False without connection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         result = client.complete_migration("test-process", "cuda:1")
         assert result is False
 
@@ -785,7 +785,7 @@ class TestOrchestratorClientWithMockStub:
         """Test complete_migration succeeds with mock stub."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.CompleteMigration.return_value = MagicMock(success=True)
 
@@ -799,7 +799,7 @@ class TestOrchestratorClientWithMockStub:
         """Test complete_migration handles server rejection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.CompleteMigration.return_value = MagicMock(success=False)
 
@@ -810,7 +810,7 @@ class TestOrchestratorClientWithMockStub:
         """Test complete_migration handles exceptions gracefully."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.CompleteMigration.side_effect = Exception("network error")
 
@@ -821,7 +821,7 @@ class TestOrchestratorClientWithMockStub:
         """Test unregister succeeds with mock stub."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Unregister.return_value = MagicMock(success=True)
         client._process_id = "test-process"
@@ -833,7 +833,7 @@ class TestOrchestratorClientWithMockStub:
         """Test request_error_recovery returns None in local mode."""
         from flexium.orchestrator.client import OrchestratorClient, ConnectionState
 
-        client = OrchestratorClient("localhost:50051", max_retries=1)
+        client = OrchestratorClient("localhost:80", max_retries=1)
         client._stub = MagicMock()
 
         # Force into local mode
@@ -849,7 +849,7 @@ class TestOrchestratorClientWithMockStub:
         """Test request_error_recovery returns target on success."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.RequestErrorRecovery.return_value = MagicMock(
             success=True,
@@ -869,7 +869,7 @@ class TestOrchestratorClientWithMockStub:
         """Test request_error_recovery returns None when no target available."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.RequestErrorRecovery.return_value = MagicMock(
             success=False,
@@ -885,7 +885,7 @@ class TestOrchestratorClientWithMockStub:
         """Test mark_gpu_healthy succeeds."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.MarkGPUHealthy.return_value = MagicMock(success=True)
 
@@ -897,7 +897,7 @@ class TestOrchestratorClientWithMockStub:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.MarkGPUHealthy.side_effect = grpc.RpcError()
 
@@ -908,7 +908,7 @@ class TestOrchestratorClientWithMockStub:
         """Test get_unhealthy_gpus returns list of GPUs."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
 
         mock_gpu = MagicMock()
@@ -929,7 +929,7 @@ class TestOrchestratorClientWithMockStub:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.GetUnhealthyGPUs.side_effect = grpc.RpcError()
 
@@ -940,7 +940,7 @@ class TestOrchestratorClientWithMockStub:
         """Test pause returns success response."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Pause.return_value = MagicMock(
             success=True,
@@ -956,7 +956,7 @@ class TestOrchestratorClientWithMockStub:
         """Test pause handles server rejection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Pause.return_value = MagicMock(
             success=False,
@@ -972,7 +972,7 @@ class TestOrchestratorClientWithMockStub:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Pause.side_effect = grpc.RpcError()
 
@@ -983,7 +983,7 @@ class TestOrchestratorClientWithMockStub:
         """Test resume returns success response."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Resume.return_value = MagicMock(
             success=True,
@@ -1000,7 +1000,7 @@ class TestOrchestratorClientWithMockStub:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Resume.side_effect = grpc.RpcError()
 
@@ -1019,7 +1019,7 @@ class TestOrchestratorClientRegister:
         """Test register succeeds on first attempt."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Register.return_value = MagicMock(
             success=True,
@@ -1038,7 +1038,7 @@ class TestOrchestratorClientRegister:
         """Test register raises on server rejection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Register.return_value = MagicMock(
             success=False,
@@ -1058,7 +1058,7 @@ class TestOrchestratorClientRegister:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051", max_retries=2)
+        client = OrchestratorClient("localhost:80", max_retries=2)
         client._stub = MagicMock()
 
         # First call fails, second succeeds
@@ -1085,7 +1085,7 @@ class TestOrchestratorClientRegister:
         import grpc
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051", max_retries=2)
+        client = OrchestratorClient("localhost:80", max_retries=2)
         client._stub = MagicMock()
         client._stub.Register.side_effect = grpc.RpcError()
 
@@ -1102,7 +1102,7 @@ class TestOrchestratorClientRegister:
         """Test register stores process info for reconnection."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Register.return_value = MagicMock(
             success=True,
@@ -1132,7 +1132,7 @@ class TestOrchestratorClientHeartbeat:
         """Test heartbeat method works with mock stub."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
         client._stub.Heartbeat.return_value = MagicMock(
             success=True,
@@ -1149,7 +1149,7 @@ class TestOrchestratorClientHeartbeat:
         """Test heartbeat response can trigger migration."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         client._stub = MagicMock()
 
         response = MagicMock()
@@ -1171,7 +1171,7 @@ class TestOrchestratorClientConnect:
         """Test connect creates gRPC channel."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
 
         with patch("grpc.insecure_channel") as mock_channel:
             mock_channel.return_value = MagicMock()
@@ -1182,7 +1182,7 @@ class TestOrchestratorClientConnect:
         """Test disconnect closes gRPC channel."""
         from flexium.orchestrator.client import OrchestratorClient
 
-        client = OrchestratorClient("localhost:50051")
+        client = OrchestratorClient("localhost:80")
         mock_channel = MagicMock()
         client._channel = mock_channel
         client._stub = MagicMock()
