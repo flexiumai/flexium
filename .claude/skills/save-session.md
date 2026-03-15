@@ -55,8 +55,15 @@ When the user invokes `/save-session`, do the following:
 
 5. **Ask about Extra section**: If there's additional context worth saving (resources, environment details, follow-up ideas, blockers, special code snippets), ask the user if they want to include an Extra section.
 
-6. **Update CLAUDE.md**: Update `/home/e155809/views/flexium_project/flexium-server/CLAUDE.md` - add new keywords to the Session Index table, mapping keywords to session file paths.
+6. **Confirm each file**: Before updating CLAUDE.md, show the user each session file that will be created and ask if they want to keep it. For each file:
+   - Show the filename and a brief summary of what it contains
+   - Ask: "Keep this session file? (yes/no/edit)"
+   - If "no", skip that file entirely
+   - If "edit", ask what changes they want before saving
+   - Only proceed with files the user confirms
 
-7. **Confirm**: Show the user what was saved and the updated keyword index.
+7. **Update CLAUDE.md**: Update `/home/e155809/views/flexium_project/flexium-server/CLAUDE.md` - add new keywords to the Session Index table, mapping keywords to session file paths. Only add keywords for files the user confirmed in step 6.
 
-8. **Ask about pushing**: Ask the user if they want to commit and push the session files to git. If yes, commit with message format: `docs: Add <session-description> session` and push.
+8. **Confirm**: Show the user what was saved and the updated keyword index.
+
+9. **Ask about pushing**: Ask the user if they want to commit and push the session files to git. If yes, commit with message format: `docs: Add <session-description> session` and push.

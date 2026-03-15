@@ -212,7 +212,7 @@ Command-line tools:
 
 2. **Environment Variables**
    ```bash
-   export GPU_ORCHESTRATOR=host:port
+   export FLEXIUM_SERVER=host:port
    export GPU_DEVICE=cuda:1
    ```
 

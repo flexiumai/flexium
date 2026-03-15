@@ -803,6 +803,30 @@ class TestPauseResume:
         assert "with _migration_lock" not in source, \
             "_do_pause must not acquire _migration_lock (would deadlock)"
 
+    def test_do_pause_has_reconnection_logic(self) -> None:
+        """Test _do_pause heartbeat loop handles orchestrator disconnection.
+
+        Regression test: when the orchestrator dies while a process is paused,
+        the pause heartbeat loop must attempt reconnection in a loop until success.
+        Without this, paused processes cannot reconnect when orchestrator restarts.
+        """
+        import flexium.auto as auto
+        import inspect
+
+        source = inspect.getsource(auto._do_pause)
+
+        # Must catch gRPC errors specifically for reconnection handling
+        assert "grpc.RpcError" in source, \
+            "_do_pause must catch grpc.RpcError for reconnection handling"
+
+        # Must attempt reconnection on connection loss
+        assert "_attempt_reconnect" in source, \
+            "_do_pause must call _attempt_reconnect when connection is lost"
+
+        # Must keep retrying in a loop
+        assert "while True" in source, \
+            "_do_pause must retry reconnection in a loop until success"
+
 
 class TestGpuUuidCaching:
     """Tests for GPU UUID caching at startup.

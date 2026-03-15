@@ -101,6 +101,10 @@ _migration_lock = threading.Lock()
 _migration_in_progress = False
 _pause_in_progress = False  # Set during _do_pause() to prevent heartbeat thread conflicts
 _migration_enabled = True  # Set to False if environment requirements not met
+_cached_visible_devices: List[Dict[str, Any]] = []  # Cached device reports for reconnect during pause
+_start_time: float = 0.0  # Unix timestamp when process started (for runtime tracking)
+_cached_memory_allocated: int = 0  # Cached memory for reconnect
+_cached_memory_reserved: int = 0  # Cached memory for reconnect
 
 
 
@@ -619,6 +623,20 @@ def _do_pause() -> None:
     Only GPU pause/resume is supported (no CPU).
     """
     global _physical_device, _current_device, _pause_in_progress
+    global _cached_memory_allocated, _cached_memory_reserved, _cached_visible_devices
+
+    # Cache memory and device info BEFORE pausing (pynvml may hang after checkpoint)
+    try:
+        import torch
+        from flexium.utils.gpu_info import get_all_device_reports, get_estimated_gpu_memory
+        import socket
+
+        if _physical_device.startswith("cuda") and torch.cuda.is_available():
+            _cached_memory_allocated = get_estimated_gpu_memory(_physical_device)
+            _cached_memory_reserved = _cached_memory_allocated
+        _cached_visible_devices = get_all_device_reports(socket.gethostname())
+    except Exception as e:
+        logger.warning(f"Failed to cache memory/devices before pause: {e}")
 
     # Set flag to prevent heartbeat thread from triggering another migration
     # while we're handling the pause/resume internally
@@ -696,10 +714,16 @@ def _do_pause() -> None:
     print("[flexium] Waiting for resume command...")
     sys.stdout.flush()
 
-    # Notify orchestrator we're paused
+    # Notify orchestrator we're paused (preserve memory info for dashboard display)
     if _orchestrator_client:
         try:
-            _orchestrator_client.complete_migration(_process_id, "__PAUSED__")
+            _orchestrator_client.complete_migration(
+                _process_id,
+                "__PAUSED__",
+                gpu_uuid=_physical_gpu_uuid,
+                gpu_name=_physical_gpu_name,
+                memory_reserved=_cached_memory_reserved,
+            )
         except Exception as e:
             logger.warning(f"Failed to notify orchestrator of pause: {e}")
 
@@ -756,8 +780,63 @@ def _do_pause() -> None:
                         _pause_in_progress = False
                         return
 
+            except grpc.RpcError as e:
+                # gRPC connection error - attempt reconnection
+                logger.warning(f"Pause heartbeat gRPC error: {e}")
+                print(f"[flexium] Lost connection to orchestrator during pause")
+                sys.stdout.flush()
+
+                # Try to reconnect with timeout, then auto-resume if orchestrator stays down
+                reconnect_interval = 5.0  # seconds between attempts
+                max_reconnect_time = 300.0  # 5 minutes max before auto-resume
+                reconnect_start = time.time()
+                reconnected = False
+
+                while True:
+                    elapsed = time.time() - reconnect_start
+                    remaining = max_reconnect_time - elapsed
+
+                    if remaining <= 0:
+                        print(f"[flexium] Orchestrator reconnect timeout ({max_reconnect_time:.0f}s)")
+                        print(f"[flexium] Auto-resuming on last device: {paused_device}")
+                        sys.stdout.flush()
+                        logger.warning(f"Orchestrator timeout - auto-resuming on {paused_device}")
+
+                        # Resume on the device we were paused from
+                        success = _do_resume_from_checkpoint(
+                            paused_device, paused_device, cached_gpu_uuids=gpu_uuids
+                        )
+
+                        if success:
+                            print(f"[flexium] === AUTO-RESUMED (local mode) ===")
+                            print(f"[flexium] Running without orchestrator. Will reconnect when available.")
+                        else:
+                            print(f"[flexium] WARNING: Auto-resume failed!")
+
+                        sys.stdout.flush()
+                        _pause_in_progress = False
+                        return
+
+                    print(f"[flexium] Attempting to reconnect... ({remaining:.0f}s remaining)")
+                    sys.stdout.flush()
+
+                    if _attempt_reconnect():
+                        print(f"[flexium] Reconnected to orchestrator!")
+                        sys.stdout.flush()
+                        reconnected = True
+                        break
+                    else:
+                        print(f"[flexium] Reconnect failed, retrying in {reconnect_interval}s...")
+                        sys.stdout.flush()
+                        time.sleep(reconnect_interval)
+
+                if reconnected:
+                    # Continue the pause loop - server will send resume command
+                    continue
+
             except Exception as e:
-                logger.warning(f"Pause heartbeat error: {e}")
+                # Non-gRPC error - log it
+                logger.warning(f"Pause heartbeat non-gRPC error: {e}")
                 import traceback
                 traceback.print_exc()
 
@@ -946,6 +1025,12 @@ def _send_heartbeat() -> None:
         hostname = socket.gethostname()
         visible_devices = get_all_device_reports(hostname)
 
+        # Cache visible devices and memory for reconnect during pause (when pynvml might hang)
+        global _cached_visible_devices, _cached_memory_allocated, _cached_memory_reserved
+        _cached_visible_devices = visible_devices
+        _cached_memory_allocated = memory_allocated
+        _cached_memory_reserved = memory_reserved
+
         # Convert to proto messages
         visible_devices_protos = []
         for device in visible_devices:
@@ -1094,19 +1179,23 @@ def _attempt_reconnect() -> bool:
         # Re-connect the gRPC channel
         _orchestrator_client.connect()
 
-        # Re-register with stored parameters
-        from flexium.utils.gpu_info import get_gpu_info
-
+        # Use cached GPU info (don't call pynvml - it may hang if paused)
         gpu_uuid = ""
         gpu_name = ""
-        gpu_info = get_gpu_info(_physical_device)
-        if gpu_info:
-            gpu_uuid = gpu_info.uuid
-            gpu_name = gpu_info.name
+        if _physical_device:
+            # Extract GPU index from device string (e.g., "cuda:0" -> 0)
+            try:
+                gpu_idx = int(_physical_device.split(":")[-1])
+                gpu_uuid = _gpu_index_to_uuid.get(gpu_idx, "")
+                gpu_name = _gpu_index_to_name.get(gpu_idx, "")
+            except (ValueError, IndexError):
+                pass
 
         from flexium.proto import orchestrator_pb2 as pb2
         import socket
 
+        # Always register with the physical device first (so server knows about it)
+        # Then mark as paused if needed
         request = pb2.RegisterRequest(
             process_id=_process_id,
             device=_physical_device,
@@ -1121,18 +1210,78 @@ def _attempt_reconnect() -> bool:
             priority=getattr(_orchestrator_client, '_priority', 50),
             preemptible=getattr(_orchestrator_client, '_preemptible', True),
             migratable=getattr(_orchestrator_client, '_migratable', True),
+            start_time=_start_time,  # Preserve original start time across reconnects
         )
 
+        # Use a timeout for the gRPC call
         response = _orchestrator_client._stub.Register(
-            request, metadata=_orchestrator_client._get_grpc_metadata()
+            request,
+            metadata=_orchestrator_client._get_grpc_metadata(),
+            timeout=5.0,
         )
 
         if response.success:
             _orchestrator_client.connection_manager.on_success()
-            print(f"[flexium] Reconnected to orchestrator")
-            sys.stdout.flush()
+
+            # Send a heartbeat with cached device info so server knows about GPUs
+            # (Can't call pynvml during pause - it may hang)
+            if _cached_visible_devices:
+                try:
+                    visible_devices_protos = []
+                    for device in _cached_visible_devices:
+                        visible_devices_protos.append(
+                            pb2.DeviceReport(
+                                gpu_uuid=device.get("gpu_uuid", ""),
+                                gpu_name=device.get("gpu_name", ""),
+                                hostname=device.get("hostname", ""),
+                                memory_total=device.get("memory_total", 0),
+                                memory_used=device.get("memory_used", 0),
+                                memory_free=device.get("memory_free", 0),
+                                gpu_utilization=device.get("gpu_utilization", 0),
+                                temperature=device.get("temperature", 0),
+                                power_usage=device.get("power_usage", 0),
+                                process_count=device.get("process_count", 0),
+                            )
+                        )
+                    heartbeat_request = pb2.HeartbeatRequest(
+                        process_id=_process_id,
+                        device=_physical_device,
+                        memory_allocated=_cached_memory_allocated,
+                        memory_reserved=_cached_memory_reserved,
+                        gpu_uuid=gpu_uuid,
+                        gpu_name=gpu_name,
+                        visible_devices=visible_devices_protos,
+                    )
+                    _orchestrator_client._stub.Heartbeat(
+                        heartbeat_request,
+                        metadata=_orchestrator_client._get_grpc_metadata(),
+                        timeout=5.0,
+                    )
+                    logger.debug(f"Sent reconnect heartbeat with {len(visible_devices_protos)} devices")
+                except Exception as e:
+                    logger.warning(f"Failed to send reconnect heartbeat: {e}")
+
+            # If we're paused, notify server about paused state
+            if _pause_in_progress:
+                try:
+                    _orchestrator_client._stub.CompleteMigration(
+                        pb2.CompleteMigrationRequest(
+                            process_id=_process_id,
+                            new_device="__PAUSED__",
+                            gpu_uuid=gpu_uuid,
+                            gpu_name=gpu_name,
+                        ),
+                        metadata=_orchestrator_client._get_grpc_metadata(),
+                        timeout=5.0,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to notify paused state: {e}")
+
+            # Don't print here - callers will print their own success message
             return True
         else:
+            print(f"[flexium] Reconnection rejected by server")
+            sys.stdout.flush()
             return False
 
     except Exception as e:
@@ -1203,6 +1352,7 @@ def _connect_orchestrator(config: FlexiumConfig) -> None:
             priority=config.priority,
             preemptible=config.preemptible,
             migratable=config.migratable,
+            start_time=_start_time,
         )
 
         if result:
@@ -1319,7 +1469,7 @@ def run(
                     loss.backward()
                     optimizer.step()
     """
-    global _current_device, _physical_device, _process_id, _heartbeat_thread
+    global _current_device, _physical_device, _process_id, _heartbeat_thread, _start_time
 
     if disabled:
         print("[flexium] Running in DISABLED mode")
@@ -1332,6 +1482,7 @@ def run(
     _current_device = config.device
     _physical_device = config.device
     _process_id = f"gpu-{uuid.uuid4().hex[:8]}"
+    _start_time = time.time()  # Track when process started for runtime display
 
     # Verify environment requirements for migration
     # This sets _migration_enabled = False if requirements not met

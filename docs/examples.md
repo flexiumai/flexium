@@ -678,7 +678,7 @@ trainer.fit(model, dataloader)
 
         # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
         flexium_callback = FlexiumCallback(
-            orchestrator="localhost:80",  # Or use GPU_ORCHESTRATOR env var
+            orchestrator="localhost:80",  # Or use FLEXIUM_SERVER env var
         )
 
         # Create trainer with Flexium callback

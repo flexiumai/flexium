@@ -306,6 +306,15 @@ class OrchestratorClient:
 
     def connect(self) -> None:
         """Connect to the orchestrator server."""
+        # Close existing channel if any (important for reconnection)
+        if self._channel is not None:
+            try:
+                self._channel.close()
+            except Exception:
+                pass
+            self._channel = None
+            self._stub = None
+
         self._channel = grpc.insecure_channel(self.address)
         self._stub = pb2_grpc.GPUOrchestratorStub(self._channel)
         logger.debug(f"Connected to orchestrator at {self.address}")
@@ -331,6 +340,7 @@ class OrchestratorClient:
         priority: int = 50,
         preemptible: bool = True,
         migratable: bool = True,
+        start_time: float = 0.0,
     ) -> Optional[str]:
         """Register with the orchestrator.
 
@@ -349,6 +359,7 @@ class OrchestratorClient:
             priority: Job priority 0-100, higher = more important.
             preemptible: Can be paused/migrated by higher priority jobs.
             migratable: Can be migrated at all.
+            start_time: Unix timestamp when process started (for runtime tracking).
 
         Returns:
             Assigned device (may differ from requested), or None if
@@ -387,6 +398,9 @@ class OrchestratorClient:
         self._preemptible = preemptible
         self._migratable = migratable
 
+        # Store start_time for re-registration
+        self._start_time = start_time
+
         request = pb2.RegisterRequest(
             process_id=process_id,
             device=device,
@@ -401,6 +415,7 @@ class OrchestratorClient:
             priority=priority,
             preemptible=preemptible,
             migratable=migratable,
+            start_time=start_time,
         )
 
         self.connection_manager.start_connecting()

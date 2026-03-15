@@ -428,7 +428,10 @@ print(f"Models: {list(checkpoint.get('models', {}).keys())}")
 
 ### Q: What happens if the orchestrator crashes?
 
-A: Training continues normally. The process will show as "stale" in the orchestrator when it restarts, but training is unaffected. Migration won't work until the orchestrator is back up.
+A: Training continues normally in "local mode". Key behaviors:
+- **Running processes**: Continue training without interruption. They automatically reconnect when the orchestrator becomes available again, preserving runtime tracking.
+- **Paused processes**: If paused for more than 5 minutes without orchestrator connection, they auto-resume on the last-used device to prevent indefinite hangs.
+- The process will show as "stale" in the orchestrator when it restarts, but training is unaffected. Migration won't work until the orchestrator is back up.
 
 ### Q: Can I run multiple training jobs on the same GPU?
 
@@ -491,7 +494,7 @@ with flexium.auto.run(orchestrator="192.168.1.100:80"):
 
 Or via environment:
 ```bash
-export GPU_ORCHESTRATOR=192.168.1.100:80
+export FLEXIUM_SERVER=192.168.1.100:80
 ```
 
 ---

@@ -67,7 +67,7 @@ def run(
 
 Priority (highest to lowest):
 1. Parameters passed to `run()`
-2. Environment variables (`GPU_ORCHESTRATOR`, `GPU_DEVICE`)
+2. Environment variables (`FLEXIUM_SERVER`, `GPU_DEVICE`)
 3. Config file (`./.flexiumrc` or `~/.flexiumrc`)
 4. Default (local mode with warning)
 
@@ -103,7 +103,7 @@ with flexium.auto.run(disabled=True):
 
 **Environment variables:**
 ```bash
-export GPU_ORCHESTRATOR=localhost:80
+export FLEXIUM_SERVER=localhost:80
 export GPU_DEVICE=cuda:1
 python train.py
 ```
@@ -129,7 +129,7 @@ If no orchestrator is configured:
 [flexium] Running in local mode (no migration support)
 [flexium]
 [flexium] To enable orchestrator, either:
-[flexium]   - Set GPU_ORCHESTRATOR=host:port environment variable
+[flexium]   - Set FLEXIUM_SERVER=host:port environment variable
 [flexium]   - Create ~/.flexiumrc with: orchestrator: host:port
 [flexium]   - Pass orchestrator='host:port' to run()
 ============================================================
@@ -320,7 +320,7 @@ device: cuda:0
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GPU_ORCHESTRATOR` | Orchestrator address | `localhost:80` |
+| `FLEXIUM_SERVER` | Orchestrator address | `localhost:80` |
 | `GPU_DEVICE` | Initial device | `cuda:0` |
 | `FLEXIUM_LOG_LEVEL` | Logging level | `DEBUG` |
 
