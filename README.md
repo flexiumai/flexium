@@ -45,12 +45,12 @@ with flexium.auto.run():
 
 ## Features
 
-- **Live Migration** - Move training between GPUs without stopping
+- **Live Migration** - Move training between GPUs on the same server without stopping
 - **Zero Code Changes** - Just wrap your training loop
 - **Zero Memory Residue** - Source GPU is completely freed
-- **Works Everywhere** - PyTorch, Lightning, HuggingFace, and more
+- **PyTorch & Lightning** - Works with PyTorch and PyTorch Lightning
 - **Web Dashboard** - Visual GPU management and monitoring
-- **Spot Instance Support** - Survive preemptions automatically
+- **Pause/Resume** - Temporarily free GPU, resume on any available GPU
 
 ## Quick Start
 
@@ -91,17 +91,17 @@ That's it! Your training is now migratable.
                               │ Heartbeat
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   FLEXIUM CLOUD                              │
+│                   FLEXIUM SERVER                             │
 │                                                              │
-│   Monitors your GPUs and triggers migrations when needed    │
-│   - Spot preemption? Auto-migrate to another GPU            │
-│   - GPU failure? Auto-recover to healthy GPU                │
-│   - Rebalancing? Move to optimize utilization               │
+│   Monitors your GPUs and coordinates migrations             │
+│   - Web dashboard for visual management                     │
+│   - One-click migration between GPUs                        │
+│   - Pause/resume training jobs                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-When migration is needed, Flexium:
-1. **Captures** complete GPU state at driver level
+When migration is triggered (via dashboard or CLI), Flexium:
+1. **Captures** complete GPU state at driver level (driver 580+)
 2. **Frees** source GPU completely (0 MB residue)
 3. **Restores** on target GPU seamlessly
 
@@ -109,25 +109,25 @@ Your training code never knows it moved.
 
 ## Use Cases
 
-### Spot Instance Training
-```python
-# Survive spot preemptions without losing progress
-with flexium.auto.run():
-    train_large_model()  # Auto-migrates when spot is reclaimed
-```
-
-### GPU Rebalancing
+### GPU Sharing
 ```python
 # Free up GPUs for teammates without killing your job
 with flexium.auto.run():
     train_model()  # Can be migrated via dashboard anytime
 ```
 
-### Hardware Failure Recovery
+### Resource Optimization
 ```python
-# Auto-recover from GPU errors
+# Move jobs between GPUs based on memory requirements
 with flexium.auto.run():
-    train_model()  # Auto-migrates on ECC errors, driver crashes
+    train_model()  # Migrate to GPU with more VRAM when needed
+```
+
+### Pause for Priority Jobs
+```python
+# Pause your job to free GPU, resume later
+with flexium.auto.run():
+    train_model()  # Pause via dashboard, resume on any GPU
 ```
 
 ## Requirements
@@ -135,7 +135,7 @@ with flexium.auto.run():
 - Python 3.8+
 - PyTorch 2.0+
 - NVIDIA GPU with driver 580+
-- CUDA 12.0+
+- CUDA 12.4+
 - Linux x86_64
 
 ## Documentation

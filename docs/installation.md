@@ -10,7 +10,7 @@ This guide covers all installation methods and requirements for Flexium.AI.
 |-----------|---------|-------------|
 | GPU | NVIDIA GPU with CUDA support | NVIDIA A100/H100 or consumer RTX 30xx/40xx |
 | RAM | 8 GB | 16+ GB |
-| Storage | 1 GB for flexium | SSD with 10+ GB free for checkpoints |
+| Storage | 1 GB for flexium | SSD recommended |
 
 ### Software
 
@@ -19,7 +19,7 @@ This guide covers all installation methods and requirements for Flexium.AI.
 | Operating System | Linux x86_64 | Ubuntu 20.04+, RHEL 8+, Debian 10+ |
 | Python | 3.8 - 3.12 | 3.10+ recommended |
 | NVIDIA Driver | **580+** | **Required** for zero-residue migration |
-| CUDA | 11.0+ | Must match PyTorch CUDA version |
+| CUDA | 12.4+ | Required for driver 580+ |
 | PyTorch | 2.0+ | With CUDA support |
 
 !!! warning "Driver 580+ Required"
@@ -77,23 +77,17 @@ pip install https://github.com/flexiumai/flexium/releases/download/v0.1.1/flexiu
 
 ## PyTorch Installation
 
-Flexium requires PyTorch with CUDA support. Install PyTorch **before** installing flexium.
+Flexium requires PyTorch with CUDA 12.4+ support. Install PyTorch **before** installing flexium.
 
-### For CUDA 11.8
-
-```bash
-pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 --index-url https://download.pytorch.org/whl/cu118
-```
-
-### For CUDA 12.1
+### For CUDA 12.4+
 
 ```bash
-pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 --index-url https://download.pytorch.org/whl/cu121
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 
 ### For Latest PyTorch
 
-Visit [pytorch.org/get-started](https://pytorch.org/get-started/locally/) to get the install command for your system.
+Visit [pytorch.org/get-started](https://pytorch.org/get-started/locally/) to get the install command for your system. Make sure to select CUDA 12.4 or higher.
 
 ### Verify PyTorch CUDA
 
@@ -103,9 +97,9 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA av
 
 Expected output:
 ```
-PyTorch: 2.1.0+cu118
+PyTorch: 2.x.x+cu124
 CUDA available: True
-CUDA version: 11.8
+CUDA version: 12.4
 ```
 
 ---
@@ -133,7 +127,6 @@ pip install flexium[dev]
 | `pytest-cov` | Coverage |
 | `mypy` | Type checking |
 | `ruff` | Linting |
-| `grpcio-tools` | Protobuf compilation |
 
 ---
 
@@ -146,8 +139,8 @@ pip install flexium[dev]
 python -m venv flexium-env
 source flexium-env/bin/activate
 
-# Install PyTorch with CUDA
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# Install PyTorch with CUDA 12.4
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
 # Install flexium
 pip install flexium
@@ -160,8 +153,8 @@ pip install flexium
 conda create -n flexium python=3.10
 conda activate flexium
 
-# Install PyTorch with CUDA
-conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
+# Install PyTorch with CUDA 12.4
+conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia
 
 # Install flexium
 pip install flexium
@@ -183,24 +176,14 @@ sudo pip install flexium
 Create `~/.flexiumrc`:
 
 ```yaml
-# Orchestrator address
-orchestrator: localhost:80
+# Server address with workspace
+server: localhost:80/myworkspace
 
 # Default device
 device: cuda:0
 
-# Checkpoint directory
-checkpoint_dir: /tmp/flexium/checkpoints
-
 # Heartbeat interval (seconds)
 heartbeat_interval: 3.0
-
-# Resource requirements
-min_gpus: 1
-max_gpus: 1
-priority: 50
-preemptible: true
-migratable: true
 ```
 
 ### Environment Variables
@@ -243,8 +226,8 @@ device: cuda:0
 # Verify flexium is installed
 python -c "import flexium; print(f'Flexium version: {flexium.__version__}')"
 
-# Verify CLI is available
-flexium-ctl --help
+# Verify module loads
+python -c "import flexium.auto; print('OK')"
 ```
 
 ### Step 2: Check GPU Access
@@ -305,7 +288,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 **Solutions:**
 1. Install NVIDIA driver: `sudo apt install nvidia-driver-580`
-2. Reinstall PyTorch with CUDA: `pip install torch --index-url https://download.pytorch.org/whl/cu118`
+2. Reinstall PyTorch with CUDA 12.4: `pip install torch --index-url https://download.pytorch.org/whl/cu124`
 
 ### "Module 'flexium' not found"
 
@@ -347,30 +330,6 @@ sudo usermod -aG video $USER
 
 # Log out and back in, or use newgrp
 newgrp video
-```
-
----
-
-## Docker Installation
-
-### Using Pre-built Image
-
-```bash
-# Pull image (when available)
-docker pull flexium/orchestrator:latest
-
-# Run orchestrator
-docker run -d -p 80:80 -p 8080:8080 flexium/orchestrator
-```
-
-### Building from Source
-
-```bash
-# From flexium directory
-docker build -t flexium:local .
-
-# Run
-docker run --gpus all -p 80:80 -p 8080:8080 flexium:local
 ```
 
 ---

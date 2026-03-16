@@ -1,90 +1,74 @@
 # Flexium Architecture
 
-This document provides an overview of the flexium system architecture.
+This document explains how Flexium enables live GPU migration for your training jobs.
 
 ## Table of Contents
 
-1. [System Overview](#system-overview)
-2. [Design Goals](#design-goals)
-3. [Core Architecture](#core-architecture)
-4. [Migration Mechanism](#migration-mechanism)
-5. [Component Overview](#component-overview)
-6. [Configuration System](#configuration-system)
+1. [Overview](#overview)
+2. [How It Works](#how-it-works)
+3. [Migration Mechanism](#migration-mechanism)
+4. [Configuration](#configuration)
 
 ---
 
-## System Overview
+## Overview
 
-Flexium is a GPU orchestration system that enables **live GPU migration** for PyTorch training jobs. It allows training processes to be moved between GPUs **without losing progress** and with **zero memory residue** on the source GPU.
+Flexium enables **live GPU migration** for PyTorch training jobs. Your training can be moved between GPUs **without losing progress** and with **zero memory residue** on the source GPU.
 
 ### Key Capabilities
 
 - **Zero VRAM Residue**: When a process migrates, ALL memory is freed from the source GPU
 - **In-Process Migration**: Training continues in the same process, same loop iteration
 - **Transparent Integration**: Just wrap your code with `flexium.auto.run()`
-- **Remote Orchestration**: Central server coordinates migrations across a cluster
-- **Web Dashboard**: Visual GPU management at `http://localhost:8080`
 - **Pause/Resume**: Free GPU completely, resume later on any available GPU
 
-### High-Level Architecture
+### How You Use It
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATOR SERVER                                   │
-│  ┌──────────────┐  ┌───────────────┐  ┌─────────────────────────────┐  │
-│  │ gRPC Server  │  │ Process       │  │ Device Registry             │  │
-│  │ :80       │  │ Registry      │  │ (tracks GPU health/usage)   │  │
-│  └──────────────┘  └───────────────┘  └─────────────────────────────┘  │
-│         │                                                               │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                    Web Dashboard (:8080)                          │  │
-│  │         Real-time process monitoring and migration control        │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ gRPC (heartbeats, migration commands)
-                                    │
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         TRAINING PROCESS                                 │
-│                                                                          │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │                    flexium.auto.run()                              │ │
-│  │                                                                    │ │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌────────────────────────┐   │ │
-│  │  │ Orchestrator│  │ Heartbeat    │  │ Migration Handler      │   │ │
-│  │  │ Client      │  │ Thread       │  │ Migration Handler      │   │ │
-│  │  └─────────────┘  └──────────────┘  └────────────────────────┘   │ │
-│  │                                                                    │ │
-│  │  ┌───────────────────────────────────────────────────────────────┐│ │
-│  │  │              User's Training Code                             ││ │
-│  │  │  model.cuda(), optimizer.step(), etc.                         ││ │
-│  │  └───────────────────────────────────────────────────────────────┘│ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                │
-│  │  GPU 0   │  │  GPU 1   │  │  GPU 2   │  │  GPU 3   │                │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                │
-└─────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                   YOUR TRAINING PROCESS                   │
+│                                                           │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │                  flexium.auto.run()                 │  │
+│  │                                                     │  │
+│  │  ┌───────────────────────────────────────────────┐  │  │
+│  │  │            Your Training Code                 │  │  │
+│  │  │  model.cuda(), optimizer.step(), etc.         │  │  │
+│  │  └───────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────┘  │
+│                                                           │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
+│  │  GPU 0  │  │  GPU 1  │  │  GPU 2  │  │  GPU 3  │       │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
+└───────────────────────────────────────────────────────────┘
+                            │
+                            │ Communicates with
+                            ▼
+┌───────────────────────────────────────────────────────────┐
+│                 FLEXIUM CLOUD (flexium.ai)                │
+│                                                           │
+│   Web dashboard for monitoring and triggering migrations  │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Design Goals
+## How It Works
 
-### 1. Zero VRAM Residue (Primary Goal)
+### Zero VRAM Residue
 
 **Problem**: Traditional approaches to GPU migration (moving tensors with `.to()`) leave memory fragments due to PyTorch's caching allocator.
 
-**Solution**: Flexium's proprietary migration technology captures and restores the complete GPU state, guaranteeing zero residue.
+**Solution**: Flexium captures and restores the complete GPU state at driver level (driver 580+), guaranteeing zero residue.
 
-### 2. In-Process Migration
+### In-Process Migration
 
-Unlike subprocess-based approaches, flexium migrates within the same process:
+Unlike checkpoint-based approaches, Flexium migrates within the same process:
 - No process restart required
 - Training continues from the exact same point
 - All Python state preserved (variables, loop counters, etc.)
 
-### 3. Minimal User Code Changes
+### Minimal Code Changes
 
 ```python
 import flexium.auto
@@ -99,147 +83,54 @@ with flexium.auto.run():
 
 ---
 
-## Core Architecture
-
-### Single-Process Model
-
-Flexium uses an in-process architecture:
-
-1. **Training Process**: Runs user's training code with flexium wrapper
-2. **Orchestrator Server**: Central coordination (can be remote)
-3. **Dashboard**: Web UI for monitoring and control
-
-### Why In-Process?
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| Subprocess isolation | Simple, guaranteed cleanup | Process restart, state serialization |
-| **In-process (Flexium)** | **No restart, seamless** | **Requires driver 580+** |
-
-Flexium uses proprietary migration technology that provides truly seamless migration - the training loop doesn't even know it happened.
-
----
-
 ## Migration Mechanism
 
-### Migration Overview
+When you trigger a migration from the dashboard:
 
-Flexium's migration technology (requires driver 580+):
-1. Captures complete GPU state
-2. Restores on a different GPU
-3. Guarantees zero residue on source GPU
+1. **Pause** - Training pauses between batches
+2. **Capture** - Complete GPU state is captured at driver level
+3. **Release** - Source GPU is completely freed (0 MB)
+4. **Restore** - State is restored on target GPU
+5. **Resume** - Training continues from the exact same point
 
-### Migration Flow
-
-```
-Time ─────────────────────────────────────────────────────────────────────►
-
-ORCHESTRATOR                    TRAINING PROCESS
-     │                              │
-     │  Heartbeat Response          │
-     │  (should_migrate=true,       │
-     │   target=cuda:1)             │
-     │ ─────────────────────────────►
-     │                              │
-     │                              │  1. Pause training (between batches)
-     │                              │
-     │                              │  2. Capture GPU state
-     │                              │
-     │                              │  3. Release source GPU
-     │                              │     - Source GPU now at 0 MB
-     │                              │
-     │                              │  4. Restore on target GPU
-     │                              │
-     │                              │  5. Resume training
-     │                              │     - Same batch, same loop iteration
-     │                              │
-     │  Heartbeat                   │
-     │  (device=cuda:1)             │
-     │ ◄─────────────────────────────
-```
+Your training code never knows it moved.
 
 ---
 
-## Component Overview
+## Configuration
 
-### 1. flexium.auto (`flexium/auto.py`)
+### Environment Variable (Recommended)
 
-The main user-facing API:
+```bash
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+```
 
-- **`run()`**: Context manager that enables migration
-- **`get_device()`**: Returns current device string
-- Heartbeat thread for orchestrator communication
-- Migration execution via Flexium's migration engine
+### Inline Parameter
 
-### 2. Orchestrator (`flexium/orchestrator/`)
+```python
+with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+    ...
+```
 
-Central coordination server:
+### Config File (`~/.flexiumrc`)
 
-- **`server.py`**: gRPC server implementation
-- **`registry.py`**: Process registry (tracks all processes)
-- **`device_registry.py`**: GPU health and utilization tracking
-- **`client.py`**: Client for communicating with server
-
-### 3. Dashboard (`flexium/dashboard/`)
-
-Web-based monitoring and control:
-
-- Real-time process list
-- GPU utilization display
-- One-click migration
-- Pause/resume controls
-
-### 4. CLI (`flexium/cli/`)
-
-Command-line tools:
-
-- **`flexium-ctl`**: Server management, process control
-  - `flexium-ctl server` - Start orchestrator
-  - `flexium-ctl list` - List processes
-  - `flexium-ctl migrate <id> <device>` - Trigger migration
-  - `flexium-ctl pause/resume` - Pause/resume processes
-
----
-
-## Configuration System
-
-### Configuration Priority (Highest to Lowest)
-
-1. **Inline Parameters**
-   ```python
-   flexium.auto.run(orchestrator="host:port", device="cuda:1")
-   ```
-
-2. **Environment Variables**
-   ```bash
-   export FLEXIUM_SERVER=host:port
-   export GPU_DEVICE=cuda:1
-   ```
-
-3. **Config File** (`~/.flexiumrc` or `./.flexiumrc`)
-   ```yaml
-   orchestrator: host:port
-   device: cuda:0
-   ```
-
-4. **Defaults**
-   - No orchestrator (local mode)
-   - Device: cuda:0
+```yaml
+server: flexium.ai:80/myworkspace
+device: cuda:0
+```
 
 ---
 
 ## Requirements
 
 - Python 3.8+
-- PyTorch 2.0+ with CUDA
+- PyTorch 2.0+ with CUDA 12.4+
 - **NVIDIA Driver 580+** (required for zero-residue migration)
 - Linux x86_64
 
 ---
 
 ## Next Steps
-
-For more information:
 
 - [Getting Started](getting-started.md)
 - [API Reference](api.md)

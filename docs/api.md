@@ -13,8 +13,7 @@ Complete API documentation for flexium.
 5. [Additional Auto APIs](#additional-auto-apis)
 6. [PyTorch Lightning](#pytorch-lightning)
 7. [Configuration](#configuration)
-8. [CLI Reference](#cli-reference)
-9. [Orchestrator Client](#orchestrator-client)
+8. [Dashboard Controls](#dashboard-controls)
 
 ---
 
@@ -38,7 +37,7 @@ with flexium.auto.run():
             optimizer.zero_grad()
 ```
 
-That's it! Your training is now migratable via the orchestrator.
+That's it! Your training is now migratable via the Flexium dashboard.
 
 ---
 
@@ -59,7 +58,7 @@ def run(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `orchestrator` | `Optional[str]` | `None` | Orchestrator address (host:port). If None, uses config/env |
+| `orchestrator` | `Optional[str]` | `None` | Flexium server address (host:port/workspace). If None, uses config/env |
 | `device` | `Optional[str]` | `None` | Initial device. If None, uses config/env or "cuda:0" |
 | `disabled` | `bool` | `False` | Bypass flexium entirely (for benchmarking) |
 
@@ -82,9 +81,9 @@ with flexium.auto.run():
     # Training code...
 ```
 
-**With orchestrator:**
+**With Flexium server:**
 ```python
-with flexium.auto.run(orchestrator="localhost:80"):
+with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
     model = Net().cuda()
 ```
 
@@ -103,7 +102,7 @@ with flexium.auto.run(disabled=True):
 
 **Environment variables:**
 ```bash
-export FLEXIUM_SERVER=localhost:80
+export FLEXIUM_SERVER=flexium.ai:80/myworkspace
 export GPU_DEVICE=cuda:1
 python train.py
 ```
@@ -121,17 +120,15 @@ These patches ensure that after Flexium swaps GPU identities during migration, u
 
 ### Warning Message
 
-If no orchestrator is configured:
+If no server is configured:
 
 ```
 ============================================================
-[flexium] WARNING: No orchestrator configured!
+[flexium] WARNING: No server configured!
 [flexium] Running in local mode (no migration support)
 [flexium]
-[flexium] To enable orchestrator, either:
-[flexium]   - Set FLEXIUM_SERVER=host:port environment variable
-[flexium]   - Create ~/.flexiumrc with: orchestrator: host:port
-[flexium]   - Pass orchestrator='host:port' to run()
+[flexium] To enable Flexium, set FLEXIUM_SERVER:
+[flexium]   export FLEXIUM_SERVER=flexium.ai:80/myworkspace
 ============================================================
 ```
 
@@ -279,7 +276,7 @@ class FlexiumCallback(Callback):
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `orchestrator` | `str` | `None` | Orchestrator address |
+| `orchestrator` | `str` | `None` | Flexium server address |
 | `device` | `str` | `None` | Initial device |
 | `disabled` | `bool` | `False` | Disable Flexium |
 
@@ -294,7 +291,7 @@ class MyModel(LightningModule):
     ...
 
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="localhost:80")],
+    callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -312,7 +309,7 @@ For more details, see [Lightning Integration](features/lightning-integration.md)
 
 ```yaml
 # ~/.flexiumrc or ./.flexiumrc
-orchestrator: localhost:80
+server: flexium.ai:80/myworkspace
 device: cuda:0
 ```
 
@@ -320,7 +317,7 @@ device: cuda:0
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `FLEXIUM_SERVER` | Orchestrator address | `localhost:80` |
+| `FLEXIUM_SERVER` | Flexium server address | `flexium.ai:80/workspace` |
 | `GPU_DEVICE` | Initial device | `cuda:0` |
 | `FLEXIUM_LOG_LEVEL` | Logging level | `DEBUG` |
 
@@ -333,150 +330,51 @@ from flexium.config import load_config
 config = load_config()
 
 # Override specific values
-config = load_config(orchestrator="myserver:80", device="cuda:2")
+config = load_config(orchestrator="flexium.ai:80/myworkspace", device="cuda:2")
 
 # Access values
-print(config.orchestrator)  # "myserver:80"
+print(config.orchestrator)  # "flexium.ai:80/myworkspace"
 print(config.device)        # "cuda:2"
 ```
 
 ---
 
-## CLI Reference
+## Dashboard Controls
 
-### Server Commands
-
-```bash
-# Start orchestrator
-flexium-ctl server [PORT] [OPTIONS]
-
-Options:
-  --dashboard           Enable web dashboard
-  --dashboard-port PORT Dashboard port (default: 8080)
-```
-
-**Examples:**
-```bash
-flexium-ctl server                    # Port 80, no dashboard
-flexium-ctl server 50052              # Custom port
-flexium-ctl server --dashboard        # With dashboard at :8080
-flexium-ctl server --dashboard --dashboard-port 9000
-```
+All process management is done through the web dashboard at [flexium.ai](https://flexium.ai).
 
 ### Process Management
 
-```bash
-# List processes
-flexium-ctl list [OPTIONS]
-
-Options:
-  --device DEVICE       Filter by device
-  --json                Output as JSON
-```
-
-**Examples:**
-```bash
-flexium-ctl list
-flexium-ctl list --device cuda:0
-flexium-ctl list --json
-```
+View all your training processes in the dashboard:
+- See process status, GPU assignment, memory usage
+- Filter by device or status
 
 ### Migration
 
-```bash
-# Migrate a process
-flexium-ctl migrate PROCESS_ID TARGET_DEVICE
-```
-
-**Examples:**
-```bash
-flexium-ctl migrate gpu-abc123 cuda:1
-flexium-ctl migrate gpu-abc123 cuda:2
-```
+To migrate a process:
+1. Find the process in the dashboard
+2. Click the "Migrate" button
+3. Select the target GPU
+4. Migration happens seamlessly
 
 ### Pause/Resume
 
-```bash
-# Pause a process (frees GPU completely)
-flexium-ctl pause PROCESS_ID
+To pause a process (frees GPU completely):
+1. Find the process in the dashboard
+2. Click "Pause"
+3. GPU memory is freed immediately
 
-# Resume a paused process
-flexium-ctl resume PROCESS_ID [DEVICE]
-```
-
-**Examples:**
-```bash
-flexium-ctl pause gpu-abc123
-flexium-ctl resume gpu-abc123           # Resume on any available GPU
-flexium-ctl resume gpu-abc123 cuda:2    # Resume on specific GPU
-```
+To resume:
+1. Find the paused process
+2. Click "Resume"
+3. Optionally select a specific GPU, or let Flexium choose
 
 ### Device Status
 
-```bash
-# Show device status
-flexium-ctl devices
-```
-
----
-
-## Orchestrator Client
-
-For programmatic control of the orchestrator.
-
-### `OrchestratorClient`
-
-```python
-from flexium.orchestrator.client import OrchestratorClient
-
-client = OrchestratorClient("localhost:80")
-```
-
-### Methods
-
-**`list_processes()`**
-```python
-def list_processes(device_filter: str = "") -> List[Dict[str, Any]]:
-    """List all registered processes."""
-```
-
-**`request_migration()`**
-```python
-def request_migration(process_id: str, target_device: str) -> bool:
-    """Request migration for a process."""
-```
-
-**`pause()`**
-```python
-def pause(process_id: str) -> bool:
-    """Pause a process (free GPU)."""
-```
-
-**`resume()`**
-```python
-def resume(process_id: str, target_device: Optional[str] = None) -> bool:
-    """Resume a paused process."""
-```
-
-### Example
-
-```python
-from flexium.orchestrator.client import OrchestratorClient
-
-client = OrchestratorClient("localhost:80")
-
-# List all processes
-processes = client.list_processes()
-for p in processes:
-    print(f"{p['process_id']}: {p['device']} - {p['status']}")
-
-# Request migration
-client.request_migration("gpu-abc123", "cuda:1")
-
-# Pause/resume
-client.pause("gpu-abc123")
-client.resume("gpu-abc123", "cuda:2")
-```
+The dashboard shows real-time status of all GPUs:
+- Memory usage per GPU
+- Running processes on each GPU
+- GPU health status
 
 ---
 

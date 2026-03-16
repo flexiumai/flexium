@@ -71,26 +71,26 @@ torch.cuda.empty_cache()     # Doesn't guarantee cleanup
 
 ### The Solution
 
-Flexium uses **proprietary migration technology** (requires NVIDIA driver 580+) that guarantees complete memory release:
+Flexium uses **driver-level migration** (requires driver 580+) that guarantees complete memory release:
 
 ```
-┌─────────────────────────────────────────┐
-│         Training on OLD GPU             │
-│                                         │
-│   Your PyTorch code runs normally       │
-│                                         │
-└─────────────────────────────────────────┘
-                    │
-                    │  MIGRATE
-                    │  (100% memory freed!)
-                    ▼
-┌─────────────────────────────────────────┐
-│         Training on NEW GPU             │
-│                                         │
-│   Resumes from exact position           │
-│   No progress lost                      │
-│                                         │
-└─────────────────────────────────────────┘
+┌───────────────────────────────────────┐
+│        Training on OLD GPU            │
+│                                       │
+│  Your PyTorch code runs normally      │
+│                                       │
+└───────────────────────────────────────┘
+                   │
+                   │  MIGRATE
+                   │  (100% memory freed!)
+                   ▼
+┌───────────────────────────────────────┐
+│        Training on NEW GPU            │
+│                                       │
+│  Resumes from exact position          │
+│  No progress lost                     │
+│                                       │
+└───────────────────────────────────────┘
 ```
 
 ---
@@ -169,52 +169,45 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 
 ## How It Works
 
-1. **Start the Orchestrator**: Central server that tracks all training jobs
-   ```bash
-   flexium-ctl server --dashboard
-   ```
+1. **Sign Up**: Create a free account at [flexium.ai](https://flexium.ai) and create a workspace
 
-2. **Run Your Training**: With flexium enabled
+2. **Connect Your Training**: Set your workspace and run
    ```bash
+   export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
    python train.py
    ```
 
-3. **Monitor & Migrate**: Via web dashboard or CLI
-   ```bash
-   flexium-ctl list
-   flexium-ctl migrate gpu-abc123 cuda:1
-   ```
+3. **Monitor & Migrate**: Via web dashboard at [flexium.ai](https://flexium.ai)
+   - See all running training jobs
+   - One-click migration between GPUs
+   - Pause and resume training
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         ORCHESTRATOR                                 │
-│              (Central server, can be remote)                        │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐    │
-│   │ gRPC Server │  │  Registry   │  │    Web Dashboard        │    │
-│   │   :80    │  │             │  │       :8080             │    │
-│   └─────────────┘  └─────────────┘  └─────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              │ gRPC
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        GPU MACHINE                                   │
-│                                                                      │
-│   ┌───────────────────────────────────────────────────────────────┐ │
-│   │                    Training Process                           │ │
-│   │  - Your PyTorch training code                                 │ │
-│   │  - Managed by flexium for migration                           │ │
-│   │  - Communicates with orchestrator                             │ │
-│   └───────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│   │  GPU 0   │  │  GPU 1   │  │  GPU 2   │  │  GPU 3   │          │
-│   └──────────┘  └──────────┘  └──────────┘  └──────────┘          │
-└─────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                      YOUR GPU MACHINE                     │
+│                                                           │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │                  Training Process                   │  │
+│  │  - Your PyTorch training code                       │  │
+│  │  - Wrapped with flexium.auto.run()                  │  │
+│  └─────────────────────────────────────────────────────┘  │
+│                                                           │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
+│  │  GPU 0  │  │  GPU 1  │  │  GPU 2  │  │  GPU 3  │       │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
+└───────────────────────────────────────────────────────────┘
+                            │
+                            │ Communicates with
+                            ▼
+┌───────────────────────────────────────────────────────────┐
+│                 FLEXIUM CLOUD (flexium.ai)                │
+│                                                           │
+│         Web dashboard for monitoring and control          │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -223,32 +216,23 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 
 ### Dynamic GPU Allocation
 
-Move training jobs between GPUs based on demand:
+Move training jobs between GPUs based on demand via the dashboard:
 
-```bash
-# High-priority job needs GPU 0
-flexium-ctl migrate low-priority-job cuda:1
-```
+1. Open your workspace at [flexium.ai](https://flexium.ai)
+2. Find the job you want to move
+3. Click "Migrate" and select the target GPU
 
 ### Memory Management
 
 Free up a GPU for a larger model:
 
-```bash
-# Move small job to make room
-flexium-ctl migrate small-job cuda:2
-nvidia-smi  # GPU 0 now has more free memory
-```
+1. Find the smaller job in the dashboard
+2. Migrate it to another GPU
+3. Your original GPU now has more free memory
 
 ### Fault Tolerance
 
-If a GPU fails, migrate affected jobs:
-
-```bash
-flexium-ctl list --device cuda:3  # Find jobs on failing GPU
-flexium-ctl migrate job-1 cuda:0
-flexium-ctl migrate job-2 cuda:1
-```
+If a GPU has issues, migrate affected jobs via dashboard - select each job and move to a healthy GPU.
 
 ### Automatic GPU Error Recovery
 
@@ -267,13 +251,9 @@ with flexium.auto.run():
 
 Test on GPU 0, then move to production GPU:
 
-```bash
-# Development
-python train.py  # Runs on cuda:0
-
-# Move to production GPU without stopping
-flexium-ctl migrate my-job cuda:7
-```
+1. Start training: `python train.py` (runs on cuda:0)
+2. Open dashboard at [flexium.ai](https://flexium.ai)
+3. Click "Migrate" to move to production GPU without stopping
 
 ---
 
@@ -287,11 +267,11 @@ flexium-ctl migrate my-job cuda:7
 
     Unlike `model.to(device)`, migration **guarantees** 100% memory is freed. Flexium's architecture ensures complete GPU release.
 
--   :material-flash:{ .lg .middle } __Automatic Error Recovery__
+-   :material-flash:{ .lg .middle } __GPU Error Detection__
 
     ---
 
-    GPU errors (OOM, device assert, ECC) are detected and handled automatically. Training migrates to a healthy GPU and resumes from checkpoint.
+    GPU errors (OOM, device assert, ECC) are detected automatically. You can then migrate to a healthy GPU via dashboard.
 
 -   :material-shield-check:{ .lg .middle } __No Single Point of Failure__
 
@@ -338,7 +318,6 @@ flexium-ctl migrate my-job cuda:7
 |---------|-------------|
 | [Zero-Residue Migration](features/zero-residue-migration.md) | Driver-level migration with zero VRAM residue |
 | [Pause/Resume](features/pause-resume.md) | Pause training to free GPU, resume later |
-| [GPU Error Recovery](features/gpu-error-recovery.md) | Automatic recovery from OOM, device assert, ECC errors |
 | [Graceful Degradation](features/graceful-degradation.md) | Standalone mode without orchestrator |
 | [Lightning Integration](features/lightning-integration.md) | PyTorch Lightning support with FlexiumCallback |
 

@@ -81,10 +81,12 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     ```
 
     **When colleague needs the GPU:**
-    ```bash
-    # One command - training continues on cuda:1
-    flexium-ctl migrate gpu-abc123 cuda:1
 
+    1. Open dashboard at [flexium.ai](https://flexium.ai)
+    2. Click "Migrate" on your process
+    3. Select cuda:1 as target
+
+    ```
     # nvidia-smi shows cuda:0 is 100% FREE
     # Training resumed from exact batch on cuda:1
     # No progress lost!
@@ -177,30 +179,28 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 === "✅ With flexium"
 
     ```bash
-    # Start orchestrator with dashboard (once)
-    $ flexium-ctl server --dashboard
+    # Set workspace (once per terminal)
+    $ export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 
     # Alice starts training
-    $ python alice_train.py  # Auto-registers with orchestrator
+    $ python alice_train.py  # Auto-registers with Flexium
 
-    # Bob starts training - orchestrator assigns cuda:1
-    $ python bob_train.py  # Gets cuda:1 automatically
+    # Bob starts training
+    $ python bob_train.py  # Also registers
 
-    # Charlie has urgent deadline
-    $ flexium-ctl list
-    PROCESS         DEVICE    STATUS    HOSTNAME
-    alice-abc123    cuda:0    running   node01
-    bob-def456      cuda:1    running   node01
+    # Charlie has urgent deadline - opens dashboard at flexium.ai
+    # Sees:
+    #   alice-abc123    cuda:0    running
+    #   bob-def456      cuda:1    running
 
-    # Charlie migrates Alice's job (no interruption)
-    $ flexium-ctl migrate alice-abc123 cuda:2
+    # Charlie clicks "Migrate" on Alice's job, selects cuda:2
 
     # Alice's training continues on cuda:2
     # cuda:0 is now free for Charlie
     # No Slack messages needed!
     ```
 
-    **Dashboard view (http://localhost:8080):**
+    **Dashboard view (flexium.ai):**
     ```
     ┌─────────────────────────────────────────────────────────────┐
     │  Flexium.AI Dashboard                                    │
@@ -299,26 +299,24 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
 === "✅ With flexium"
 
-    ```bash
-    # See all jobs with context
-    $ flexium-ctl list
-    PROCESS           DEVICE    STATUS    HOSTNAME
-    alice-research    cuda:0    running   node01
-    bob-experiment    cuda:1    running   node01
-    charlie-train     cuda:2    running   node01
-    dave-baseline     cuda:3    running   node01
+    ```
+    # Open dashboard at flexium.ai - see all jobs:
+    #
+    # PROCESS           DEVICE    STATUS    VRAM
+    # alice-research    cuda:0    running   28.5 GB
+    # bob-experiment    cuda:1    running   24.2 GB
+    # charlie-train     cuda:2    running   30.1 GB
+    # dave-baseline     cuda:3    running   2.1 GB  ← just started
 
-    # Check dashboard for memory usage - dave just started (low VRAM)
-    # dave-baseline just started - easy to pause and restart later
+    # dave-baseline just started (low VRAM) - easy to pause
+    # Click "Pause" on dave's job in dashboard
+    # cuda:3 is now FREE!
 
-    # Pause dave's job (frees GPU completely)
-    $ flexium-ctl pause dave-baseline
-
-    # cuda:3 is now FREE - run your urgent demo
+    # Run your urgent demo
     $ python urgent_inference.py --device cuda:3
 
-    # After demo, resume dave back to GPU
-    $ flexium-ctl resume dave-baseline cuda:3
+    # After demo, click "Resume" on dave's job in dashboard
+    # Select cuda:3 as target
 
     # Result:
     # - Demo succeeded
@@ -379,7 +377,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="orchestrator:80"):
+    with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
         model = BigModel().cuda()
 
         for epoch in range(1000):
@@ -580,7 +578,7 @@ from flexium.lightning import FlexiumCallback
 
 # Just add the callback - that's it!
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="localhost:80")],
+    callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -678,7 +676,7 @@ trainer.fit(model, dataloader)
 
         # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
         flexium_callback = FlexiumCallback(
-            orchestrator="localhost:80",  # Or use FLEXIUM_SERVER env var
+            orchestrator="flexium.ai:80/myworkspace",  # Or use FLEXIUM_SERVER env var
         )
 
         # Create trainer with Flexium callback
@@ -700,14 +698,14 @@ trainer.fit(model, dataloader)
 ### Running the Lightning Example
 
 ```bash
-# Start orchestrator
-flexium-ctl server --dashboard
+# Set workspace
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 
 # Run Lightning example
 python examples/lightning/mnist_lightning.py
 
-# With custom settings
-python examples/lightning/mnist_lightning.py --orchestrator localhost:80 --epochs 5
+# With custom epochs
+python examples/lightning/mnist_lightning.py --epochs 5
 
 # Baseline (no flexium)
 python examples/lightning/mnist_lightning.py --disabled
@@ -720,7 +718,7 @@ python examples/lightning/mnist_lightning.py --disabled
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="localhost:80"):
+    with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
         model = Net().cuda()
         optimizer = torch.optim.Adam(model.parameters())
 
@@ -736,7 +734,7 @@ python examples/lightning/mnist_lightning.py --disabled
     from flexium.lightning import FlexiumCallback
 
     trainer = Trainer(
-        callbacks=[FlexiumCallback(orchestrator="localhost:80")],
+        callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
         max_epochs=10,
         accelerator="gpu",
         devices=1,
@@ -858,7 +856,7 @@ Run multiple training jobs and migrate between them:
 # job1.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="orchestrator:80"):
+with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
     # Training job 1
     model1 = Model1().cuda()
     train(model1)
@@ -866,22 +864,16 @@ with flexium.auto.run(orchestrator="orchestrator:80"):
 # job2.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="orchestrator:80"):
+with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
     # Training job 2
     model2 = Model2().cuda()
     train(model2)
 ```
 
-Then use CLI to manage:
+Then use the dashboard at [flexium.ai](https://flexium.ai) to manage:
 
-```bash
-# See both jobs
-flexium-ctl list
-
-# Move job1 to cuda:0, job2 to cuda:1
-flexium-ctl migrate job1-process-id cuda:0
-flexium-ctl migrate job2-process-id cuda:1
-```
+- See both jobs and their GPU assignments
+- Click "Migrate" to move jobs between GPUs as needed
 
 ---
 
@@ -901,7 +893,7 @@ flexium-ctl migrate job2-process-id cuda:1
 
 
     def train():
-        with flexium.auto.run(orchestrator="prod-orchestrator:80"):
+        with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
             model = MyModel().cuda()
             optimizer = torch.optim.Adam(model.parameters())
 
@@ -1858,14 +1850,14 @@ Training a Vision Transformer for image classification:
 ## Running the Examples
 
 ```bash
-# Start orchestrator
-flexium-ctl server --dashboard
+# Set workspace
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 
 # Run MNIST example
 python examples/simple/mnist_train_auto.py
 
-# Run with custom settings
-python examples/simple/mnist_train_auto.py --orchestrator localhost:80 --epochs 5
+# Run with custom epochs
+python examples/simple/mnist_train_auto.py --epochs 5
 
 # Run without flexium (baseline)
 python examples/simple/mnist_train_auto.py --disabled
@@ -1879,10 +1871,10 @@ Flexium's key feature is zero-residue GPU migration - when your training moves f
 
 ### How It Works
 
-Flexium uses proprietary migration technology that operates at a lower level than PyTorch's memory management, ensuring complete GPU memory release.
+Flexium operates at the driver level (driver 580+), ensuring complete GPU memory release.
 
-1. **Checkpoint**: Training state is safely preserved using Flexium's migration engine
-2. **Release**: Source GPU resources are completely freed
+1. **Capture**: GPU state is captured at driver level
+2. **Release**: Source GPU is completely freed (0 MB)
 3. **Restore**: State is restored on target GPU
 4. **Continue**: Training continues seamlessly
 

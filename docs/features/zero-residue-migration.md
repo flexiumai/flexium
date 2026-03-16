@@ -4,11 +4,11 @@ Flexium's zero-residue migration ensures that when a training job migrates from 
 
 ## How It Works
 
-Traditional checkpoint-based migration leaves memory artifacts on the original GPU until the process terminates. Flexium uses a different approach:
+Traditional approaches (like `model.to(device)`) leave memory fragments due to PyTorch's caching allocator. Flexium uses driver-level migration (requires driver 580+):
 
-1. **State Capture** - All model parameters, optimizer states, and training context are serialized
-2. **Memory Release** - CUDA memory is explicitly freed before migration
-3. **State Restoration** - The training state is restored on the target GPU
+1. **Capture** - Complete GPU state is captured at driver level
+2. **Release** - Source GPU is completely freed (0 MB)
+3. **Restore** - State is restored on target GPU
 
 ## Benefits
 
@@ -18,15 +18,15 @@ Traditional checkpoint-based migration leaves memory artifacts on the original G
 
 ## Usage
 
-Zero-residue migration is enabled by default when using the Flexium driver:
+Zero-residue migration is automatic:
 
 ```python
-import flexium
+import flexium.auto
 
-flexium.auto.patch()
-
-# Your training code here
-# Migration happens automatically when orchestrated
+with flexium.auto.run():
+    # Your training code here
+    # Migration happens when triggered via dashboard
+    train_model()
 ```
 
 ## Verification

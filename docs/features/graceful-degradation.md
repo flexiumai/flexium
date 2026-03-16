@@ -1,46 +1,42 @@
 # Graceful Degradation
 
-Flexium supports graceful degradation, allowing training to continue even when some GPUs become unavailable.
+Flexium supports graceful degradation - your training continues even if connection to Flexium is lost.
 
 ## Overview
 
-In distributed training scenarios, GPU failures don't have to mean job failure. Flexium can automatically adjust your training to use fewer GPUs while maintaining training integrity.
+Flexium is not a single point of failure. If the connection to Flexium cloud is lost, your training continues normally in "local mode". When connection is restored, Flexium automatically reconnects.
 
 ## How It Works
 
-1. **Detection** - Flexium detects GPU unavailability (failure, preemption, etc.)
-2. **Assessment** - Determines if training can continue with remaining GPUs
-3. **Adjustment** - Reconfigures distributed training for the new GPU count
-4. **Continuation** - Training resumes with adjusted parallelism
-
-## Configuration
-
-```python
-from flexium.config import FlexiumConfig
-
-config = FlexiumConfig(
-    allow_degradation=True,
-    min_gpus=1,          # Minimum GPUs required
-    rebalance_data=True, # Redistribute data across remaining GPUs
-)
-```
+1. **Connection Lost** - Network issue or Flexium maintenance
+2. **Local Mode** - Training continues on current GPU without interruption
+3. **Reconnection** - Flexium automatically attempts to reconnect
+4. **Restored** - When connection is back, full functionality resumes
 
 ## Behavior
 
-| Original GPUs | Available GPUs | Action |
-|--------------|----------------|--------|
-| 8 | 7 | Continue with 7, adjust batch distribution |
-| 8 | 4 | Continue with 4, rebalance workload |
-| 8 | 0 | Pause and wait for GPU availability |
+| Scenario | Training | Migration | Dashboard |
+|----------|----------|-----------|-----------|
+| Connected | ✅ Runs | ✅ Available | ✅ Visible |
+| Disconnected | ✅ Runs | ❌ Unavailable | ❌ Not visible |
+| Reconnected | ✅ Runs | ✅ Available | ✅ Visible |
 
-## Use Cases
+## What You'll See
 
-- **Spot Instance Training** - Continue when some spot instances are reclaimed
-- **Shared Clusters** - Adapt when GPUs are reallocated
-- **Hardware Issues** - Maintain training despite partial failures
+When connection is lost:
+```
+[flexium] Lost connection, attempting reconnect...
+[flexium] Running in local mode
+```
 
-## Limitations
+When connection is restored:
+```
+[flexium] Reconnected!
+```
 
-- Learning rate and batch size may need manual adjustment for optimal convergence
-- Some distributed strategies may not support arbitrary GPU counts
-- Checkpoint compatibility requires same model architecture
+## Key Points
+
+- **Training never stops** due to Flexium connection issues
+- **No data loss** - your training progress is unaffected
+- **Automatic reconnection** - no manual intervention needed
+- **Paused processes auto-resume** after 5 minutes if connection isn't restored

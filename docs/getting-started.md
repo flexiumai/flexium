@@ -42,21 +42,19 @@ Core dependencies (installed automatically):
 Development dependencies:
 
 - `pytest>=7.0.0` - Testing framework
-- `grpcio-tools>=1.50.0` - gRPC code generation
 
 ## Quick Start
 
 ### Step 1: Connect to Flexium Server
 
-Flexium uses a cloud-based or self-hosted server architecture. Set the `FLEXIUM_SERVER` environment variable with your workspace:
+Flexium is a cloud-hosted service. Set the `FLEXIUM_SERVER` environment variable with your workspace:
 
 ```bash
 # Format: host:port/workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
-
-# Or for cloud:
 export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 ```
+
+Sign up for free at [flexium.ai](https://flexium.ai) to create your workspace.
 
 ### Step 2: Add flexium to Your Training Script
 
@@ -108,14 +106,12 @@ python train.py
 
 ### Step 4: Monitor and Migrate
 
-Open your workspace dashboard to:
+Open your workspace dashboard at [flexium.ai](https://flexium.ai) to:
 
 - See all running training jobs
 - Monitor GPU utilization
 - Trigger migrations with one click
 - Pause and resume training jobs
-
-For self-hosted servers, the dashboard is at `http://localhost:8080/workspace/myworkspace`
 
 ## Configuration
 
@@ -180,13 +176,13 @@ python -c "import flexium; print('OK')"
 
 6. Verify zero residue with `nvidia-smi` - source GPU should show 0 MB for flexium process
 
-## Server Reconnection
+## Connection Resilience
 
-Flexium automatically reconnects if the server restarts:
+Flexium automatically handles connection issues:
 
-- On connection loss, you'll see: `[flexium] Lost connection to orchestrator, attempting reconnect...`
-- On successful reconnection: `[flexium] Reconnected to orchestrator!`
-- Training continues uninterrupted during brief server outages
+- On connection loss, you'll see: `[flexium] Lost connection, attempting reconnect...`
+- On successful reconnection: `[flexium] Reconnected!`
+- Training continues uninterrupted during brief outages
 
 ## Next Steps
 
