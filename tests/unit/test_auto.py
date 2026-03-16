@@ -513,21 +513,25 @@ class TestPauseFunctionality:
             "_do_pause must clear flag when returning early"
 
     def test_do_resume_from_checkpoint_builds_device_map_for_different_gpu(self) -> None:
-        """Test _do_resume_from_checkpoint builds device map when resuming to different GPU."""
+        """Test _do_resume_from_checkpoint builds device map when resuming to different GPU.
+
+        Note: The current implementation uses restore-then-migrate approach,
+        so this test verifies that _do_migration is called for different devices.
+        """
         import flexium.auto as auto
 
         calls = []
 
-        def mock_build_device_map(source: int, target: int) -> str:
-            calls.append(f"build_map:{source}->{target}")
-            return "GPU-0=GPU-1,GPU-1=GPU-0"
-
         def mock_restore(pid: int, device_map: str = None) -> bool:
-            calls.append(f"restore:{pid}:{device_map}")
+            calls.append(f"restore:{device_map}")
             return True
 
         def mock_unlock(pid: int) -> bool:
-            calls.append(f"unlock:{pid}")
+            calls.append("unlock")
+            return True
+
+        def mock_do_migration(target_device: str) -> bool:
+            calls.append(f"do_migration:{target_device}")
             return True
 
         original_physical = auto._physical_device
@@ -537,15 +541,20 @@ class TestPauseFunctionality:
             auto._physical_device = "cuda:0"
             auto._orchestrator_client = MagicMock()
 
-            with patch.object(auto, "_build_device_map", mock_build_device_map):
-                with patch.object(auto, "_driver_restore", mock_restore):
-                    with patch.object(auto, "_driver_unlock", mock_unlock):
+            with patch.object(auto, "_driver_restore", mock_restore):
+                with patch.object(auto, "_driver_unlock", mock_unlock):
+                    with patch.object(auto, "_do_migration", mock_do_migration):
                         result = auto._do_resume_from_checkpoint("cuda:0", "cuda:1")
 
             assert result is True
-            assert "build_map:0->1" in calls, "should build device map for different GPUs"
-            assert any("restore:" in c and "GPU-0=GPU-1" in c for c in calls), \
-                "should restore with device map"
+            # Should first restore to original device (no device_map)
+            assert "restore:None" in calls, f"should restore first: {calls}"
+            # Should then call _do_migration for the actual migration
+            assert "do_migration:cuda:1" in calls, f"should migrate after restore: {calls}"
+            # Restore should happen before migration
+            restore_idx = calls.index("restore:None")
+            migrate_idx = calls.index("do_migration:cuda:1")
+            assert restore_idx < migrate_idx, "restore should happen before migration"
 
         finally:
             auto._physical_device = original_physical
