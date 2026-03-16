@@ -1835,3 +1835,266 @@ class TestDoResumeFromCheckpoint:
         finally:
             auto._physical_device = original_physical
             auto._orchestrator_client = original_client
+
+
+class TestGPUErrorRecovery:
+    """Tests for GPU error recovery functionality."""
+
+    def test_classify_cuda_error_oom(self) -> None:
+        """Test _classify_cuda_error identifies OOM errors."""
+        import flexium.auto as auto
+        import torch
+
+        # Test OutOfMemoryError
+        oom_error = torch.cuda.OutOfMemoryError("CUDA out of memory")
+        error_type, _ = auto._classify_cuda_error(oom_error)
+        assert error_type == "OOM"
+
+    def test_classify_cuda_error_oom_runtime(self) -> None:
+        """Test _classify_cuda_error identifies OOM in RuntimeError."""
+        import flexium.auto as auto
+
+        # Test RuntimeError with OOM message
+        runtime_oom = RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")
+        error_type, _ = auto._classify_cuda_error(runtime_oom)
+        assert error_type == "OOM"
+
+    def test_classify_cuda_error_ecc(self) -> None:
+        """Test _classify_cuda_error identifies ECC errors."""
+        import flexium.auto as auto
+
+        ecc_error = RuntimeError("CUDA error: uncorrectable ECC error")
+        error_type, _ = auto._classify_cuda_error(ecc_error)
+        assert error_type == "ECC"
+
+    def test_classify_cuda_error_device_assert(self) -> None:
+        """Test _classify_cuda_error identifies device assert errors."""
+        import flexium.auto as auto
+
+        assert_error = RuntimeError("CUDA error: device-side assert triggered")
+        error_type, _ = auto._classify_cuda_error(assert_error)
+        assert error_type == "DEVICE_ASSERT"
+
+    def test_classify_cuda_error_illegal_access(self) -> None:
+        """Test _classify_cuda_error identifies illegal memory access."""
+        import flexium.auto as auto
+
+        illegal_error = RuntimeError("CUDA error: an illegal memory access was encountered")
+        error_type, _ = auto._classify_cuda_error(illegal_error)
+        assert error_type == "ILLEGAL_ACCESS"
+
+    def test_classify_cuda_error_launch_failure(self) -> None:
+        """Test _classify_cuda_error identifies launch failures."""
+        import flexium.auto as auto
+
+        launch_error = RuntimeError("CUDA error: unspecified launch failure")
+        error_type, _ = auto._classify_cuda_error(launch_error)
+        assert error_type == "LAUNCH_FAILURE"
+
+    def test_classify_cuda_error_unknown(self) -> None:
+        """Test _classify_cuda_error returns UNKNOWN for non-CUDA errors."""
+        import flexium.auto as auto
+
+        other_error = ValueError("Not a CUDA error")
+        error_type, _ = auto._classify_cuda_error(other_error)
+        assert error_type == "UNKNOWN"
+
+    def test_estimate_memory_needed_gib(self) -> None:
+        """Test _estimate_memory_needed parses GiB values."""
+        import flexium.auto as auto
+
+        msg = "CUDA out of memory. Tried to allocate 2.50 GiB"
+        memory = auto._estimate_memory_needed(msg)
+        assert memory == int(2.5 * 1024 * 1024 * 1024)
+
+    def test_estimate_memory_needed_mib(self) -> None:
+        """Test _estimate_memory_needed parses MiB values."""
+        import flexium.auto as auto
+
+        msg = "CUDA out of memory. Tried to allocate 512.00 MiB"
+        memory = auto._estimate_memory_needed(msg)
+        assert memory == int(512 * 1024 * 1024)
+
+    def test_estimate_memory_needed_no_match(self) -> None:
+        """Test _estimate_memory_needed returns 0 for unparseable messages."""
+        import flexium.auto as auto
+
+        msg = "Some other error message"
+        memory = auto._estimate_memory_needed(msg)
+        assert memory == 0
+
+    def test_recoverable_success_no_error(self) -> None:
+        """Test recoverable context manager with no error."""
+        import flexium.auto as auto
+
+        # Simple case - no error, should just pass through
+        result = []
+        for attempt in auto.recoverable():
+            with attempt:
+                result.append("executed")
+
+        assert result == ["executed"]
+
+    def test_recoverable_simple_context_manager(self) -> None:
+        """Test recoverable as simple context manager (no retry)."""
+        import flexium.auto as auto
+
+        # Direct context manager usage (single attempt, no auto-retry)
+        result = []
+        with auto.recoverable():
+            result.append("executed")
+
+        assert result == ["executed"]
+
+    def test_recoverable_non_cuda_error_propagates(self) -> None:
+        """Test recoverable re-raises non-CUDA errors."""
+        import flexium.auto as auto
+
+        with pytest.raises(ValueError, match="Not a CUDA error"):
+            for attempt in auto.recoverable():
+                with attempt:
+                    raise ValueError("Not a CUDA error")
+
+    def test_recoverable_unknown_runtime_error_propagates(self) -> None:
+        """Test recoverable re-raises unknown RuntimeErrors."""
+        import flexium.auto as auto
+
+        with pytest.raises(RuntimeError, match="Some other runtime error"):
+            for attempt in auto.recoverable():
+                with attempt:
+                    raise RuntimeError("Some other runtime error")
+
+    def test_recoverable_oom_with_successful_migration(self) -> None:
+        """Test recoverable handles OOM with successful migration."""
+        import flexium.auto as auto
+        import torch
+
+        call_count = [0]
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(max_retries=3):
+                            with attempt:
+                                call_count[0] += 1
+                                if call_count[0] == 1:
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                                # Second call succeeds
+
+            # Should have been called twice (first fail, second success)
+            assert call_count[0] == 2
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_oom_migration_disabled(self) -> None:
+        """Test recoverable fails when migration is disabled."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        try:
+            auto._migration_enabled = False
+
+            with pytest.raises(RuntimeError, match="migration disabled"):
+                with patch.object(auto, "_clear_cuda_error_state"):
+                    for attempt in auto.recoverable():
+                        with attempt:
+                            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_oom_no_target_available(self) -> None:
+        """Test recoverable fails when no recovery target available."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return None  # No target available
+
+        try:
+            auto._migration_enabled = True
+
+            with pytest.raises(RuntimeError, match="no suitable GPU available"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(max_retries=1):
+                            with attempt:
+                                raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_ecc_error_recovery(self) -> None:
+        """Test recoverable handles ECC errors."""
+        import flexium.auto as auto
+
+        call_count = [0]
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            assert error_type == "ECC"
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(max_retries=3):
+                            with attempt:
+                                call_count[0] += 1
+                                if call_count[0] == 1:
+                                    raise RuntimeError("CUDA error: uncorrectable ECC error")
+                                # Second call succeeds
+
+            assert call_count[0] == 2
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_max_retries_exceeded(self) -> None:
+        """Test recoverable fails after max retries exceeded."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True  # Migration succeeds but error keeps happening
+
+        try:
+            auto._migration_enabled = True
+
+            with pytest.raises(RuntimeError, match="after 2 retries"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_do_migration", mock_do_migration):
+                        with patch.object(auto, "_clear_cuda_error_state"):
+                            for attempt in auto.recoverable(max_retries=2):
+                                with attempt:
+                                    # Always fail
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled

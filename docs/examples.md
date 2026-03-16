@@ -125,31 +125,33 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
     with flexium.auto.run():
         model = LargeModel().cuda()
+        optimizer = torch.optim.Adam(model.parameters())
 
         for epoch in range(100):
             for batch in dataloader:
-                # At epoch 47, batch 892... OOM detected!
-                # flexium can:
-                # 1. Detect the OOM error
-                # 2. Migrate to GPU with more VRAM
-                # 3. Restore training state
-                # 4. Continue training
-                pass
+                # Wrap training step with recoverable() for auto-recovery
+                for attempt in flexium.auto.recoverable():
+                    with attempt:
+                        data, target = batch[0].cuda(), batch[1].cuda()
+                        output = model(data)
+                        loss = criterion(output, target)
+                        loss.backward()
+                        optimizer.step()
+                        optimizer.zero_grad()
 
     # Result:
-    # - Training continues on new device
-    # - You wake up to a completed job
-    # - Minimal manual intervention needed
+    # - At epoch 47, batch 892: OOM detected
+    # - Automatically migrates to GPU with more VRAM
+    # - Retries the batch on new GPU
+    # - Training continues uninterrupted
+    # - You wake up to a completed job!
     ```
 
     **What you see in logs:**
     ```
-    [flexium] GPU Out of Memory detected
-    [flexium]   Memory in use: 14.2 GB
-    [flexium]   Tried to allocate: 2.0 GB
-    [flexium] Requesting migration...
-    [flexium] Migrating to cuda:2 (24GB VRAM)
-    [flexium] Training resumed
+    [flexium] GPU error: OOM (attempt 1/3)
+    [flexium] Recovering: migrating to cuda:2...
+    [flexium] Recovery successful - now on cuda:2, retrying operation...
     ```
 
 ---

@@ -56,6 +56,7 @@ nav:
     - Troubleshooting: troubleshooting.md
   - Features:
     - Zero-Residue Migration: features/zero-residue-migration.md
+    - GPU Error Recovery: features/gpu-error-recovery.md
     - Pause/Resume: features/pause-resume.md
     - Graceful Degradation: features/graceful-degradation.md
     - Lightning Integration: features/lightning-integration.md

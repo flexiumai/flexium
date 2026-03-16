@@ -1517,3 +1517,333 @@ def run(
         yield
     finally:
         _disconnect_orchestrator()
+
+
+# =============================================================================
+# GPU Error Recovery
+# =============================================================================
+
+# Error types that can be recovered via migration
+_RECOVERABLE_CUDA_ERRORS = {
+    "OOM": ["out of memory", "CUDA out of memory"],
+    "ECC": ["uncorrectable ECC error", "ECC error"],
+    "DEVICE_ASSERT": ["device-side assert", "CUDA error: device assert"],
+    "ILLEGAL_ACCESS": ["illegal memory access", "an illegal memory access was encountered"],
+    "LAUNCH_FAILURE": ["launch failure", "unspecified launch failure"],
+}
+
+
+def _classify_cuda_error(error: BaseException) -> tuple[str, str]:
+    """Classify a CUDA error by type.
+
+    Parameters:
+        error: The exception to classify.
+
+    Returns:
+        Tuple of (error_type, error_message). error_type is one of:
+        "OOM", "ECC", "DEVICE_ASSERT", "ILLEGAL_ACCESS", "LAUNCH_FAILURE", "UNKNOWN"
+    """
+    import torch
+
+    error_msg = str(error).lower()
+
+    # Check for OutOfMemoryError specifically
+    if isinstance(error, torch.cuda.OutOfMemoryError):
+        return "OOM", str(error)
+
+    # Check for RuntimeError with CUDA error messages
+    if isinstance(error, RuntimeError):
+        for error_type, patterns in _RECOVERABLE_CUDA_ERRORS.items():
+            for pattern in patterns:
+                if pattern.lower() in error_msg:
+                    return error_type, str(error)
+
+    return "UNKNOWN", str(error)
+
+
+def _estimate_memory_needed(error_msg: str) -> int:
+    """Estimate memory needed from OOM error message.
+
+    Parameters:
+        error_msg: The OOM error message.
+
+    Returns:
+        Estimated memory needed in bytes, or 0 if cannot parse.
+    """
+    import re
+
+    # Try to parse "Tried to allocate X.XX GiB"
+    match = re.search(r"Tried to allocate ([\d.]+)\s*(GiB|MiB|GB|MB)", error_msg)
+    if match:
+        value = float(match.group(1))
+        unit = match.group(2).upper()
+        if "GI" in unit or "G" in unit:
+            return int(value * 1024 * 1024 * 1024)
+        else:
+            return int(value * 1024 * 1024)
+
+    return 0
+
+
+def _clear_cuda_error_state() -> None:
+    """Clear CUDA error state after an error.
+
+    This attempts to recover CUDA to a usable state after an error.
+    """
+    try:
+        import torch
+
+        # Synchronize to ensure all pending operations complete/fail
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+
+        # Clear cached memory
+        torch.cuda.empty_cache()
+
+        # Reset peak memory stats
+        torch.cuda.reset_peak_memory_stats()
+
+        logger.debug("CUDA error state cleared")
+    except Exception as e:
+        logger.warning(f"Failed to clear CUDA error state: {e}")
+
+
+def _request_recovery_target(error_type: str, memory_needed: int = 0) -> Optional[str]:
+    """Request a recovery target GPU from orchestrator.
+
+    Parameters:
+        error_type: Type of error ("OOM", "ECC", etc.)
+        memory_needed: For OOM, estimated bytes needed.
+
+    Returns:
+        Target device string (e.g., "cuda:1") or None if no target available.
+    """
+    global _orchestrator_client, _process_id, _current_device, _physical_gpu_uuid
+
+    if _orchestrator_client is None:
+        logger.warning("Cannot request recovery: no orchestrator connection")
+        return None
+
+    if _orchestrator_client.connection_manager.is_local_mode:
+        logger.warning("Cannot request recovery: in local mode")
+        return None
+
+    result = _orchestrator_client.request_error_recovery(
+        process_id=_process_id,
+        error_type=error_type,
+        current_device=_current_device,
+        memory_needed=memory_needed,
+        current_gpu_uuid=_physical_gpu_uuid,
+    )
+
+    if result and result.get("target_device"):
+        return result["target_device"]
+
+    return None
+
+
+class _RecoverableAttempt:
+    """Context manager for a single attempt within recoverable().
+
+    This is yielded by the recoverable() iterator and handles exception
+    suppression for retry logic.
+    """
+
+    def __init__(self, parent: "recoverable"):
+        self._parent = parent
+        self._success = False
+
+    def __enter__(self) -> "_RecoverableAttempt":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> bool:
+        import torch
+
+        # No exception - success!
+        if exc_type is None:
+            self._success = True
+            return False
+
+        # Check if it's a recoverable CUDA error
+        if not isinstance(exc_val, (torch.cuda.OutOfMemoryError, RuntimeError)):
+            return False  # Re-raise non-CUDA errors
+
+        # Classify the error
+        error_type, error_msg = _classify_cuda_error(exc_val)
+
+        if error_type == "UNKNOWN":
+            return False  # Re-raise unknown errors
+
+        # Store error info for parent to handle
+        self._parent._last_error = exc_val
+        self._parent._last_error_type = error_type
+        self._parent._last_error_msg = error_msg
+        self._success = False
+
+        # Suppress the exception - parent iterator will handle recovery
+        return True
+
+
+class recoverable:
+    """Iterator/context manager for automatic GPU error recovery with retry.
+
+    Wraps a training step to enable automatic recovery from GPU errors.
+    If an OOM, ECC, or other CUDA error occurs, this will:
+    1. Clear the CUDA error state
+    2. Request a suitable GPU from the orchestrator
+    3. Migrate to the new GPU
+    4. Retry the wrapped code block
+
+    Parameters:
+        max_retries: Maximum number of recovery attempts (default: 3).
+
+    Raises:
+        RuntimeError: If recovery fails after max_retries.
+        The original exception: If the error is not recoverable.
+
+    Example:
+        with flexium.auto.run():
+            for batch in dataloader:
+                for attempt in flexium.auto.recoverable():
+                    with attempt:
+                        output = model(data.cuda())
+                        loss = criterion(output, target)
+                        loss.backward()
+                        optimizer.step()
+                        optimizer.zero_grad()
+    """
+
+    def __init__(self, max_retries: int = 3):
+        """Initialize the recoverable iterator.
+
+        Parameters:
+            max_retries: Maximum number of recovery attempts (default: 3).
+        """
+        self.max_retries = max_retries
+        self._attempts = 0
+        self._last_error: Optional[BaseException] = None
+        self._last_error_type: str = ""
+        self._last_error_msg: str = ""
+
+    def __iter__(self) -> Iterator[_RecoverableAttempt]:
+        """Iterate over recovery attempts."""
+        while self._attempts <= self.max_retries:
+            self._attempts += 1
+            attempt = _RecoverableAttempt(self)
+
+            yield attempt
+
+            # Check if attempt succeeded
+            if attempt._success:
+                return  # Done - exit iterator
+
+            # Attempt failed - handle recovery
+            self._handle_recovery()
+
+        # Exhausted all retries
+        raise RuntimeError(
+            f"GPU error recovery failed after {self.max_retries} retries. "
+            f"Original error: {self._last_error}"
+        )
+
+    def __enter__(self) -> "_RecoverableAttempt":
+        """Enter context manager - for simple single-attempt usage.
+
+        For automatic retry, use the iterator pattern instead:
+            for attempt in recoverable():
+                with attempt:
+                    # your code
+
+        Direct context manager usage only handles one attempt:
+            with recoverable():
+                # your code (no automatic retry)
+        """
+        self._iter = iter(self)
+        self._current_attempt = next(self._iter)
+        return self._current_attempt.__enter__()
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> bool:
+        """Exit context manager - handle errors for single attempt."""
+        return self._current_attempt.__exit__(exc_type, exc_val, exc_tb)
+
+    def _handle_recovery(self) -> None:
+        """Handle recovery after a failed attempt."""
+        error_type = self._last_error_type
+        error_msg = self._last_error_msg
+
+        logger.warning(
+            f"GPU error detected: {error_type} (attempt {self._attempts}/{self.max_retries})"
+        )
+        print(f"[flexium] GPU error: {error_type} (attempt {self._attempts}/{self.max_retries})")
+        sys.stdout.flush()
+
+        # Check if migration is enabled
+        if not _migration_enabled:
+            logger.error("Recovery requires migration, but migration is disabled")
+            print("[flexium] ERROR: GPU error recovery requires migration support.")
+            print("[flexium] Migration is disabled (driver 580+ required).")
+            sys.stdout.flush()
+            raise RuntimeError(
+                f"GPU error recovery failed: migration disabled. "
+                f"Original error: {self._last_error}"
+            ) from self._last_error
+
+        # Clear CUDA error state
+        _clear_cuda_error_state()
+
+        # Estimate memory needed for OOM
+        memory_needed = 0
+        if error_type == "OOM":
+            memory_needed = _estimate_memory_needed(error_msg)
+            if memory_needed > 0:
+                logger.info(f"OOM: estimated {memory_needed / 1e9:.2f} GB needed")
+
+        # Request recovery target from orchestrator
+        target = _request_recovery_target(error_type, memory_needed)
+
+        if target is None:
+            if self._attempts >= self.max_retries:
+                logger.error(f"No recovery target available after {self._attempts} attempts")
+                print(f"[flexium] ERROR: No GPU available for recovery.")
+                sys.stdout.flush()
+                raise RuntimeError(
+                    f"GPU error recovery failed after {self._attempts} retries: "
+                    f"no suitable GPU available. Original error: {self._last_error}"
+                ) from self._last_error
+            else:
+                logger.info("No recovery target, will retry on same GPU...")
+                print("[flexium] No recovery target available, retrying on current GPU...")
+                sys.stdout.flush()
+                time.sleep(1.0)
+                return  # Continue to next attempt
+
+        # Migrate to new GPU
+        logger.info(f"Migrating to {target} for error recovery")
+        print(f"[flexium] Recovering: migrating to {target}...")
+        sys.stdout.flush()
+
+        success = _do_migration(target)
+
+        if not success:
+            logger.error(f"Migration to {target} failed")
+            print(f"[flexium] ERROR: Migration to {target} failed.")
+            sys.stdout.flush()
+            if self._attempts >= self.max_retries:
+                raise RuntimeError(
+                    f"GPU error recovery failed after {self._attempts} retries: "
+                    f"migration failed. Original error: {self._last_error}"
+                ) from self._last_error
+            return  # Continue to next attempt
+
+        print(f"[flexium] Recovery successful - now on {target}, retrying operation...")
+        sys.stdout.flush()

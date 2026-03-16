@@ -253,11 +253,11 @@ Test on GPU 0, then move to production GPU:
 
     Unlike `model.to(device)`, migration **guarantees** 100% memory is freed. Flexium's architecture ensures complete GPU release.
 
--   :material-flash:{ .lg .middle } __GPU Error Detection__
+-   :material-flash:{ .lg .middle } __GPU Error Recovery__
 
     ---
 
-    GPU errors (OOM, device assert, ECC) are detected automatically. You can then migrate to a healthy GPU via dashboard.
+    GPU errors (OOM, device assert, ECC) can be recovered automatically. Use `recoverable()` to enable auto-migration and retry on errors.
 
 -   :material-shield-check:{ .lg .middle } __No Single Point of Failure__
 
@@ -303,6 +303,7 @@ Test on GPU 0, then move to production GPU:
 | Feature | Description |
 |---------|-------------|
 | [Zero-Residue Migration](features/zero-residue-migration.md) | Driver-level migration with zero VRAM residue |
+| [GPU Error Recovery](features/gpu-error-recovery.md) | Automatic recovery from OOM, ECC, and other GPU errors |
 | [Pause/Resume](features/pause-resume.md) | Pause training to free GPU, resume later |
 | [Graceful Degradation](features/graceful-degradation.md) | Standalone mode without orchestrator |
 | [Lightning Integration](features/lightning-integration.md) | PyTorch Lightning support with FlexiumCallback |
