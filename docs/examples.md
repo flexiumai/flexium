@@ -6,17 +6,18 @@ This page provides comprehensive examples of using Flexium.AI in various scenari
 
 1. [Before & After: Real-World Scenarios](#before-after-real-world-scenarios)
 2. [Basic Examples](#basic-examples)
-3. [MNIST Training](#mnist-training)
-4. [PyTorch Lightning](#pytorch-lightning)
-5. [ResNet Training](#resnet-training)
-6. [Multi-GPU Workflows](#multi-gpu-workflows)
-7. [Production Patterns](#production-patterns)
-8. [Advanced Examples](#advanced-examples)
+3. [GPU Error Recovery Demo](#gpu-error-recovery-demo)
+4. [MNIST Training](#mnist-training)
+5. [PyTorch Lightning](#pytorch-lightning)
+6. [ResNet Training](#resnet-training)
+7. [Multi-GPU Workflows](#multi-gpu-workflows)
+8. [Production Patterns](#production-patterns)
+9. [Advanced Examples](#advanced-examples)
     - [GAN Training (DCGAN)](#gan-training-dcgan)
     - [Diffusion Model Training (DDPM)](#diffusion-model-training-ddpm)
     - [Transformer Training (GPT-style)](#transformer-training-gpt-style)
     - [Vision Transformer (ViT)](#vision-transformer-vit-training)
-9. [Zero-Residue Migration](#zero-residue-migration)
+10. [Zero-Residue Migration](#zero-residue-migration)
 
 ---
 
@@ -430,6 +431,40 @@ The simplest way to add flexium:
             if i % 100 == 0:
                 print(f"Step {i}, Loss: {loss.item():.4f}")
     ```
+
+---
+
+## GPU Error Recovery Demo
+
+Interactive demo showing how Flexium recovers from OOM errors by migrating to another GPU.
+
+### Running the Demo
+
+```bash
+# Simple mode - operation is lost, training continues
+python examples/simple/oom_recovery_demo.py --mode simple
+
+# Decorator mode - operation is replayed with same data
+python examples/simple/oom_recovery_demo.py --mode decorator
+
+# Iterator mode - you control the retry loop
+python examples/simple/oom_recovery_demo.py --mode iterator
+```
+
+### What It Demonstrates
+
+| Mode | Behavior |
+|------|----------|
+| `simple` | Batch 3 triggers OOM, is lost, batches 4-5 continue on new GPU |
+| `decorator` | OOM triggers migration, same function is called again with same args |
+| `iterator` | OOM triggers migration, next loop iteration runs with same data |
+
+The demo:
+
+1. Spawns a subprocess to fill 80% of GPU 0
+2. Tries to allocate 30% more (triggers OOM)
+3. Migrates to a free GPU
+4. For decorator/iterator: verifies same data produces same result
 
 ---
 

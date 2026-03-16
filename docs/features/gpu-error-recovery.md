@@ -199,6 +199,23 @@ GPU error recovery works **with or without** an orchestrator connection:
    - Decorator: Function is called again with same arguments
    - Iterator: Next iteration of the for loop runs
 
+## Try It Out
+
+Run the interactive demo to see GPU error recovery in action:
+
+```bash
+# Simple mode - operation is lost, training continues
+python examples/simple/oom_recovery_demo.py --mode simple
+
+# Decorator mode - operation is replayed with same data
+python examples/simple/oom_recovery_demo.py --mode decorator
+
+# Iterator mode - you control the retry loop
+python examples/simple/oom_recovery_demo.py --mode iterator
+```
+
+The demo spawns a subprocess to fill GPU memory, then triggers OOM and shows the recovery process. The decorator and iterator modes verify that the same data produces the same result after migration.
+
 ## Limitations
 
 - Only works with supported CUDA error types
