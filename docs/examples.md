@@ -118,7 +118,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     # - Have to manually restart, find a GPU with more VRAM
     ```
 
-=== "✅ With flexium"
+=== "✅ With flexium (simple)"
 
     ```python
     import flexium.auto
@@ -129,22 +129,58 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
         for epoch in range(100):
             for batch in dataloader:
-                # Wrap training step with recoverable() for auto-recovery
-                for attempt in flexium.auto.recoverable():
-                    with attempt:
-                        data, target = batch[0].cuda(), batch[1].cuda()
-                        output = model(data)
-                        loss = criterion(output, target)
-                        loss.backward()
-                        optimizer.step()
-                        optimizer.zero_grad()
+                # Simple recoverable - if OOM, batch is lost but training continues
+                with flexium.auto.recoverable():
+                    data, target = batch[0].cuda(), batch[1].cuda()
+                    output = model(data)
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+    # Result:
+    # - At epoch 47, batch 892: OOM detected
+    # - That batch is LOST (not retried)
+    # - Automatically migrates to GPU with more VRAM
+    # - Training continues with next batch
+    # - You wake up to a completed job!
+    ```
+
+    **What you see in logs:**
+    ```
+    [flexium] GPU error: OOM
+    [flexium] WARNING: The current operation is LOST. Migrating to new GPU...
+    [flexium] Migrating to cuda:2...
+    [flexium] Migration complete. Training continues (current batch was lost).
+    ```
+
+=== "✅ With flexium (retry)"
+
+    ```python
+    import flexium.auto
+
+    # Use decorator to RETRY the same batch on new GPU
+    @flexium.auto.recoverable(retries=3)
+    def train_step(model, data, target, optimizer, criterion):
+        output = model(data.cuda())
+        loss = criterion(output, target.cuda())
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+    with flexium.auto.run():
+        model = LargeModel().cuda()
+        optimizer = torch.optim.Adam(model.parameters())
+
+        for epoch in range(100):
+            for batch in dataloader:
+                train_step(model, batch[0], batch[1], optimizer, criterion)
 
     # Result:
     # - At epoch 47, batch 892: OOM detected
     # - Automatically migrates to GPU with more VRAM
-    # - Retries the batch on new GPU
-    # - Training continues uninterrupted
-    # - You wake up to a completed job!
+    # - RETRIES the same batch on new GPU
+    # - No data is lost!
     ```
 
     **What you see in logs:**

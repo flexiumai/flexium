@@ -1984,7 +1984,7 @@ class TestGPUErrorRecovery:
             with patch.object(auto, "_request_recovery_target", mock_request_recovery):
                 with patch.object(auto, "_do_migration", mock_do_migration):
                     with patch.object(auto, "_clear_cuda_error_state"):
-                        for attempt in auto.recoverable(max_retries=3):
+                        for attempt in auto.recoverable(retries=3):
                             with attempt:
                                 call_count[0] += 1
                                 if call_count[0] == 1:
@@ -2032,7 +2032,7 @@ class TestGPUErrorRecovery:
             with pytest.raises(RuntimeError, match="no suitable GPU available"):
                 with patch.object(auto, "_request_recovery_target", mock_request_recovery):
                     with patch.object(auto, "_clear_cuda_error_state"):
-                        for attempt in auto.recoverable(max_retries=1):
+                        for attempt in auto.recoverable(retries=1):
                             with attempt:
                                 raise torch.cuda.OutOfMemoryError("CUDA out of memory")
 
@@ -2059,7 +2059,7 @@ class TestGPUErrorRecovery:
             with patch.object(auto, "_request_recovery_target", mock_request_recovery):
                 with patch.object(auto, "_do_migration", mock_do_migration):
                     with patch.object(auto, "_clear_cuda_error_state"):
-                        for attempt in auto.recoverable(max_retries=3):
+                        for attempt in auto.recoverable(retries=3):
                             with attempt:
                                 call_count[0] += 1
                                 if call_count[0] == 1:
@@ -2091,10 +2091,153 @@ class TestGPUErrorRecovery:
                 with patch.object(auto, "_request_recovery_target", mock_request_recovery):
                     with patch.object(auto, "_do_migration", mock_do_migration):
                         with patch.object(auto, "_clear_cuda_error_state"):
-                            for attempt in auto.recoverable(max_retries=2):
+                            for attempt in auto.recoverable(retries=2):
                                 with attempt:
                                     # Always fail
                                     raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_simple_oom_loses_operation(self) -> None:
+        """Test simple context manager loses operation but continues."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+        executed_after_error = [False]
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        # Simple context manager - operation is LOST
+                        with auto.recoverable():
+                            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+                        # This executes because exception was suppressed
+                        executed_after_error[0] = True
+
+            # Should have continued after the error
+            assert executed_after_error[0], "Should continue after OOM with simple context manager"
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_decorator_retries(self) -> None:
+        """Test decorator pattern retries the function."""
+        import flexium.auto as auto
+        import torch
+
+        call_count = [0]
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            @auto.recoverable(retries=3)
+            def train_step():
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                return "success"
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        result = train_step()
+
+            # Should have retried and succeeded
+            assert call_count[0] == 2, "Decorator should retry on OOM"
+            assert result == "success"
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_decorator_with_args(self) -> None:
+        """Test decorator passes arguments correctly."""
+        import flexium.auto as auto
+        import torch
+
+        call_count = [0]
+        received_args = []
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            @auto.recoverable(retries=3)
+            def train_step(batch_id, lr=0.01):
+                call_count[0] += 1
+                received_args.append((batch_id, lr))
+                if call_count[0] == 1:
+                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                return batch_id * 2
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        result = train_step(42, lr=0.001)
+
+            assert call_count[0] == 2
+            assert result == 84
+            # Both calls should have received same args
+            assert received_args == [(42, 0.001), (42, 0.001)]
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_decorator_no_parens(self) -> None:
+        """Test decorator without parentheses works."""
+        import flexium.auto as auto
+        import torch
+
+        call_count = [0]
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            @auto.recoverable
+            def train_step():
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                return "done"
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        result = train_step()
+
+            assert call_count[0] == 2
+            assert result == "done"
 
         finally:
             auto._migration_enabled = original_enabled

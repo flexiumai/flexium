@@ -1690,45 +1690,149 @@ class _RecoverableAttempt:
 
 
 class recoverable:
-    """Iterator/context manager for automatic GPU error recovery with retry.
+    """Automatic GPU error recovery - migrate and optionally retry on CUDA errors.
 
-    Wraps a training step to enable automatic recovery from GPU errors.
-    If an OOM, ECC, or other CUDA error occurs, this will:
+    When a GPU error occurs (OOM, ECC, device assert, etc.), this will:
     1. Clear the CUDA error state
     2. Request a suitable GPU from the orchestrator
     3. Migrate to the new GPU
-    4. Retry the wrapped code block
 
-    Parameters:
-        max_retries: Maximum number of recovery attempts (default: 3).
+    There are THREE ways to use this, from simplest to most control:
 
-    Raises:
-        RuntimeError: If recovery fails after max_retries.
-        The original exception: If the error is not recoverable.
+    **Option 1: Simple context manager (LOSES the failed operation)**
 
-    Example:
+        The simplest approach. If an error occurs, we migrate to a new GPU
+        and continue. THE CURRENT OPERATION IS LOST - if you were in a
+        training loop, that batch is skipped.
+
+        ```python
         with flexium.auto.run():
             for batch in dataloader:
-                for attempt in flexium.auto.recoverable():
+                with flexium.auto.recoverable():
+                    output = model(batch.cuda())
+                    loss.backward()
+                    optimizer.step()
+                # If OOM happened above, we're now on a new GPU
+                # but that batch was lost - training continues with next batch
+        ```
+
+    **Option 2: Decorator (REPLAYS the failed operation)**
+
+        Wrap your training step function. If an error occurs, we migrate
+        and RETRY the function call with the same arguments.
+
+        ```python
+        @flexium.auto.recoverable(retries=3)
+        def train_step(model, batch, optimizer):
+            output = model(batch.cuda())
+            loss = output.sum()
+            loss.backward()
+            optimizer.step()
+
+        with flexium.auto.run():
+            for batch in dataloader:
+                train_step(model, batch, optimizer)  # Auto-retries on error
+        ```
+
+    **Option 3: Iterator pattern (REPLAYS, advanced)**
+
+        Most control, but most verbose. You write the retry loop structure.
+
+        ```python
+        with flexium.auto.run():
+            for batch in dataloader:
+                for attempt in flexium.auto.recoverable(retries=3):
                     with attempt:
-                        output = model(data.cuda())
-                        loss = criterion(output, target)
+                        output = model(batch.cuda())
                         loss.backward()
                         optimizer.step()
-                        optimizer.zero_grad()
+        ```
+
+    Parameters:
+        retries: Maximum retry attempts for decorator/iterator patterns (default: 3).
+                 Ignored for simple context manager (Option 1).
+
+    Raises:
+        RuntimeError: If recovery fails after max retries (decorator/iterator only).
+        The original exception: If the error is not a recoverable CUDA error.
     """
 
-    def __init__(self, max_retries: int = 3):
-        """Initialize the recoverable iterator.
+    def __init__(self, retries_or_func: Any = None, *, retries: int = 3):
+        """Initialize recoverable.
+
+        Supports multiple calling conventions:
+        - recoverable() - default 3 retries
+        - recoverable(retries=5) - custom retries
+        - @recoverable - decorator without parens (retries_or_func is the function)
+        - @recoverable(retries=5) - decorator with config
 
         Parameters:
-            max_retries: Maximum number of recovery attempts (default: 3).
+            retries_or_func: Either the wrapped function (callable) when used as
+                           @recoverable without parens, or None.
+            retries: Maximum retry attempts for decorator/iterator patterns (default: 3).
         """
-        self.max_retries = max_retries
+        # Handle @recoverable (no parens) - first arg is the function
+        if callable(retries_or_func):
+            self._func: Optional[Callable] = retries_or_func
+            self.max_retries = retries
+        else:
+            self._func = None
+            self.max_retries = retries
+
         self._attempts = 0
         self._last_error: Optional[BaseException] = None
         self._last_error_type: str = ""
         self._last_error_msg: str = ""
+
+    def __call__(self, *args, **kwargs):
+        """Support decorator and direct call patterns."""
+        # Case 1: @recoverable(retries=N) - we're being used as decorator factory
+        # The first call after __init__ will have a function as the only arg
+        if self._func is None and len(args) == 1 and callable(args[0]) and not kwargs:
+            self._func = args[0]
+            return self
+
+        # Case 2: Actually calling the wrapped function
+        if self._func is not None:
+            return self._call_with_retry(*args, **kwargs)
+
+        # Case 3: Something unexpected
+        raise TypeError("recoverable() missing required function to wrap")
+
+    def _call_with_retry(self, *args, **kwargs):
+        """Call the wrapped function with retry logic."""
+        self._attempts = 0
+
+        while self._attempts <= self.max_retries:
+            self._attempts += 1
+            try:
+                return self._func(*args, **kwargs)
+            except BaseException as e:
+                import torch
+
+                # Check if recoverable CUDA error
+                if not isinstance(e, (torch.cuda.OutOfMemoryError, RuntimeError)):
+                    raise
+
+                error_type, error_msg = _classify_cuda_error(e)
+                if error_type == "UNKNOWN":
+                    raise
+
+                self._last_error = e
+                self._last_error_type = error_type
+                self._last_error_msg = error_msg
+
+                if self._attempts > self.max_retries:
+                    raise RuntimeError(
+                        f"GPU error recovery failed after {self.max_retries} retries. "
+                        f"Original error: {e}"
+                    ) from e
+
+                # Handle recovery (migrate to new GPU)
+                self._handle_recovery()
+
+        # Should not reach here
+        raise RuntimeError("Unexpected state in recoverable")
 
     def __iter__(self) -> Iterator[_RecoverableAttempt]:
         """Iterate over recovery attempts."""
@@ -1751,21 +1855,15 @@ class recoverable:
             f"Original error: {self._last_error}"
         )
 
-    def __enter__(self) -> "_RecoverableAttempt":
-        """Enter context manager - for simple single-attempt usage.
+    def __enter__(self) -> "recoverable":
+        """Enter context manager for simple usage (no retry, operation is lost on error).
 
-        For automatic retry, use the iterator pattern instead:
-            for attempt in recoverable():
-                with attempt:
-                    # your code
+        WARNING: If a GPU error occurs, the current operation is LOST.
+        We migrate to a new GPU, but cannot replay what was inside the `with` block.
 
-        Direct context manager usage only handles one attempt:
-            with recoverable():
-                # your code (no automatic retry)
+        For automatic retry, use the decorator or iterator pattern instead.
         """
-        self._iter = iter(self)
-        self._current_attempt = next(self._iter)
-        return self._current_attempt.__enter__()
+        return self
 
     def __exit__(
         self,
@@ -1773,8 +1871,95 @@ class recoverable:
         exc_val: Optional[BaseException],
         exc_tb: Optional[Any],
     ) -> bool:
-        """Exit context manager - handle errors for single attempt."""
-        return self._current_attempt.__exit__(exc_type, exc_val, exc_tb)
+        """Exit context manager - handle errors (migrate but DON'T retry).
+
+        If a recoverable CUDA error occurred:
+        1. Clear error state
+        2. Migrate to new GPU
+        3. Suppress the exception (operation is lost, training continues)
+
+        Non-CUDA errors are re-raised.
+        """
+        import torch
+
+        # No exception - success
+        if exc_type is None:
+            return False
+
+        # Check if it's a recoverable CUDA error
+        if not isinstance(exc_val, (torch.cuda.OutOfMemoryError, RuntimeError)):
+            return False  # Re-raise non-CUDA errors
+
+        # Classify the error
+        error_type, error_msg = _classify_cuda_error(exc_val)
+
+        if error_type == "UNKNOWN":
+            return False  # Re-raise unknown errors
+
+        # Store error info
+        self._last_error = exc_val
+        self._last_error_type = error_type
+        self._last_error_msg = error_msg
+
+        # Log the error
+        logger.warning(f"GPU error detected: {error_type}")
+        print(f"[flexium] GPU error: {error_type}")
+        print(f"[flexium] WARNING: The current operation is LOST. Migrating to new GPU...")
+        sys.stdout.flush()
+
+        # Handle recovery (migrate to new GPU)
+        try:
+            self._handle_recovery_simple()
+            print(f"[flexium] Migration complete. Training continues (current batch was lost).")
+            sys.stdout.flush()
+            return True  # Suppress exception, training continues
+        except RuntimeError as e:
+            # Migration failed - re-raise original error
+            logger.error(f"Migration failed: {e}")
+            print(f"[flexium] ERROR: Migration failed. Original error will be raised.")
+            sys.stdout.flush()
+            return False
+
+    def _handle_recovery_simple(self) -> None:
+        """Handle recovery for simple context manager (no retry count tracking)."""
+        error_type = self._last_error_type
+        error_msg = self._last_error_msg
+
+        # Check if migration is enabled
+        if not _migration_enabled:
+            raise RuntimeError(
+                f"GPU error recovery requires migration support (driver 580+). "
+                f"Original error: {self._last_error}"
+            )
+
+        # Clear CUDA error state
+        _clear_cuda_error_state()
+
+        # Estimate memory needed for OOM
+        memory_needed = 0
+        if error_type == "OOM":
+            memory_needed = _estimate_memory_needed(error_msg)
+            if memory_needed > 0:
+                logger.info(f"OOM: estimated {memory_needed / 1e9:.2f} GB needed")
+
+        # Request recovery target from orchestrator
+        target = _request_recovery_target(error_type, memory_needed)
+
+        if target is None:
+            raise RuntimeError(
+                f"No suitable GPU available for recovery. "
+                f"Original error: {self._last_error}"
+            )
+
+        # Migrate to new GPU
+        logger.info(f"Migrating to {target} for error recovery")
+        print(f"[flexium] Migrating to {target}...")
+        sys.stdout.flush()
+
+        success = _do_migration(target)
+
+        if not success:
+            raise RuntimeError(f"Migration to {target} failed")
 
     def _handle_recovery(self) -> None:
         """Handle recovery after a failed attempt."""

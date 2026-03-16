@@ -137,18 +137,18 @@ If no server is configured:
 
 ## flexium.auto.recoverable()
 
-Iterator/context manager for automatic GPU error recovery with retry.
+Automatic GPU error recovery - migrate and optionally retry on CUDA errors.
 
 ```python
 class recoverable:
-    def __init__(self, max_retries: int = 3):
+    def __init__(self, retries: int = 3):
 ```
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `max_retries` | `int` | `3` | Maximum number of recovery attempts |
+| `retries` | `int` | `3` | Maximum retry attempts (decorator/iterator only) |
 
 ### Supported Errors
 
@@ -160,68 +160,44 @@ class recoverable:
 | Illegal Access | Message contains "illegal memory access" |
 | Launch Failure | Message contains "launch failure" |
 
-### Usage (Iterator Pattern - Recommended)
+### Three Usage Patterns
 
-For automatic retry on GPU errors:
-
-```python
-import flexium.auto
-
-with flexium.auto.run():
-    for batch in dataloader:
-        for attempt in flexium.auto.recoverable():
-            with attempt:
-                output = model(batch.cuda())
-                loss = criterion(output, target)
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-```
-
-If a CUDA error occurs:
-1. The error state is cleared
-2. A suitable GPU is requested from the orchestrator
-3. Training is migrated to the new GPU
-4. The code block is retried
-
-### Usage (Simple Context Manager)
-
-For single-attempt error classification (no automatic retry):
+**Option 1: Simple Context Manager (operation is LOST)**
 
 ```python
 with flexium.auto.recoverable():
-    output = model(batch.cuda())
+    output = model(batch.cuda())  # Lost if OOM, training continues
 ```
 
-### Examples
+**Option 2: Decorator (operation is RETRIED)**
 
-**OOM Recovery:**
 ```python
-for attempt in flexium.auto.recoverable(max_retries=5):
-    with attempt:
-        # This might OOM - will auto-migrate if it does
-        output = large_model(huge_batch.cuda())
+@flexium.auto.recoverable(retries=3)
+def train_step(model, batch):
+    return model(batch.cuda())
+
+train_step(model, batch)  # Retried on OOM
 ```
 
-**ECC Error Recovery:**
+**Option 3: Iterator (advanced, operation is RETRIED)**
+
 ```python
-for attempt in flexium.auto.recoverable():
+for attempt in flexium.auto.recoverable(retries=3):
     with attempt:
-        # If GPU has ECC error, migrate to healthy GPU
-        result = model(data.cuda())
+        output = model(batch.cuda())  # Retried on OOM
 ```
 
 ### Raises
 
-- `RuntimeError`: If recovery fails after `max_retries` attempts
-- Original exception: If the error is not recoverable (non-CUDA error)
+- `RuntimeError`: If recovery fails after `retries` attempts (decorator/iterator only)
+- Original exception: If the error is not a recoverable CUDA error
 
 ### Notes
 
-- Requires migration to be enabled (driver 580+)
-- Requires orchestrator connection for finding alternative GPUs
-- Non-CUDA errors are re-raised immediately
-- Unknown RuntimeErrors are also re-raised
+- **Simple context manager**: Operation is lost, training continues
+- **Decorator/Iterator**: Operation is retried on new GPU
+- Requires migration (driver 580+) and orchestrator connection
+- Non-CUDA errors are always re-raised immediately
 
 For more details, see [GPU Error Recovery](features/gpu-error-recovery.md).
 
