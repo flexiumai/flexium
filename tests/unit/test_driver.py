@@ -448,3 +448,119 @@ class TestCaptureUnlock:
                 assert result is False
         finally:
             _driver._interface_path = original_path
+
+
+class TestCaptureStateException:
+    """Tests for capture_state exception handling."""
+
+    def test_capture_state_exception(self) -> None:
+        """Test capture_state handles exceptions."""
+        from flexium import _driver
+
+        original_path = _driver._interface_path
+
+        try:
+            _driver._interface_path = Path("/usr/bin/test-tool")
+
+            with patch("subprocess.run", side_effect=Exception("checkpoint error")):
+                result = _driver.capture_state(12345)
+                assert result is False
+        finally:
+            _driver._interface_path = original_path
+
+
+class TestRestoreStateException:
+    """Tests for restore_state exception handling."""
+
+    def test_restore_state_exception(self) -> None:
+        """Test restore_state handles exceptions."""
+        from flexium import _driver
+
+        original_path = _driver._interface_path
+
+        try:
+            _driver._interface_path = Path("/usr/bin/test-tool")
+
+            with patch("subprocess.run", side_effect=Exception("restore error")):
+                result = _driver.restore_state(12345)
+                assert result is False
+        finally:
+            _driver._interface_path = original_path
+
+    def test_restore_state_failure_stderr(self) -> None:
+        """Test restore_state logs stderr on failure."""
+        from flexium import _driver
+
+        original_path = _driver._interface_path
+
+        try:
+            _driver._interface_path = Path("/usr/bin/test-tool")
+
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stderr = "Error: device not found"
+            mock_result.stdout = ""
+
+            with patch("subprocess.run", return_value=mock_result):
+                result = _driver.restore_state(12345)
+                assert result is False
+        finally:
+            _driver._interface_path = original_path
+
+
+class TestIsAvailableSearchPaths:
+    """Tests for is_available searching paths."""
+
+    def test_is_available_finds_tool_in_path(self) -> None:
+        """Test is_available finds tool via shutil.which."""
+        from flexium import _driver
+
+        original_disabled = _driver._interface_disabled
+        original_available = _driver._interface_available
+        original_path = _driver._interface_path
+
+        try:
+            _driver._interface_disabled = False
+            _driver._interface_available = None  # Force check
+            _driver._interface_path = None
+
+            # Mock driver version check to pass
+            with patch.object(_driver, "_check_driver_version", return_value=True):
+                # Mock shutil.which to return a path
+                with patch("shutil.which", return_value="/usr/bin/test-tool"):
+                    result = _driver.is_available()
+                    assert result is True
+
+        finally:
+            _driver._interface_disabled = original_disabled
+            _driver._interface_available = original_available
+            _driver._interface_path = original_path
+
+    def test_is_available_searches_paths(self) -> None:
+        """Test is_available searches common paths when which fails."""
+        from flexium import _driver
+
+        original_disabled = _driver._interface_disabled
+        original_available = _driver._interface_available
+        original_path = _driver._interface_path
+
+        try:
+            _driver._interface_disabled = False
+            _driver._interface_available = None  # Force check
+            _driver._interface_path = None
+
+            # Mock driver version check to pass
+            with patch.object(_driver, "_check_driver_version", return_value=True):
+                # Mock shutil.which to return None (not in PATH)
+                with patch("shutil.which", return_value=None):
+                    # Mock _get_search_paths to return non-existent paths
+                    mock_paths = [Path("/nonexistent/path/tool")]
+                    with patch.object(_driver, "_get_search_paths", return_value=mock_paths):
+                        result = _driver.is_available()
+                        # Should return False since paths don't exist
+                        assert result is False
+
+        finally:
+            _driver._interface_disabled = original_disabled
+            _driver._interface_available = original_available
+            _driver._interface_path = original_path

@@ -38,7 +38,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set
 
 import grpc
 
@@ -102,6 +102,7 @@ _migration_in_progress = False
 _pause_in_progress = False  # Set during _do_pause() to prevent heartbeat thread conflicts
 _migration_enabled = True  # Set to False if environment requirements not met
 _cached_visible_devices: List[Dict[str, Any]] = []  # Cached device reports for reconnect during pause
+_failed_gpus: Set[str] = set()  # GPUs that have failed (for standalone recovery)
 _start_time: float = 0.0  # Unix timestamp when process started (for runtime tracking)
 _cached_memory_allocated: int = 0  # Cached memory for reconnect
 _cached_memory_reserved: int = 0  # Cached memory for reconnect
@@ -1608,8 +1609,111 @@ def _clear_cuda_error_state() -> None:
         logger.warning(f"Failed to clear CUDA error state: {e}")
 
 
+def _request_recovery_target_local(error_type: str, memory_needed: int = 0) -> Optional[str]:
+    """Find a recovery target GPU locally (standalone mode).
+
+    Scans available GPUs and picks the best candidate for migration,
+    avoiding the current (failed) GPU.
+
+    Parameters:
+        error_type: Type of error ("OOM", "ECC", etc.)
+        memory_needed: For OOM, estimated bytes needed.
+
+    Returns:
+        Target device string (e.g., "cuda:1") or None if no target available.
+    """
+    global _current_device, _physical_gpu_uuid, _failed_gpus
+    import torch
+
+    try:
+        device_count = torch.cuda.device_count()
+        if device_count <= 1:
+            logger.warning("No alternative GPUs available for recovery")
+            return None
+
+        # Get current logical device index
+        current_idx = 0
+        if _current_device and _current_device.startswith("cuda:"):
+            try:
+                current_idx = int(_current_device.split(":")[1])
+            except (ValueError, IndexError):
+                pass
+
+        # Try to get memory info for all GPUs
+        candidates = []
+        for idx in range(device_count):
+            if idx == current_idx:
+                continue  # Skip current (failed) GPU
+
+            # Check if this GPU was previously marked as failed
+            device_str = f"cuda:{idx}"
+            if device_str in _failed_gpus:
+                logger.debug(f"Skipping {device_str}: previously failed")
+                continue
+
+            # Get GPU info including free memory
+            try:
+                import pynvml
+                pynvml.nvmlInit()
+
+                # Get physical index for this logical device
+                from flexium.utils.gpu_info import _get_visible_device_indices
+                visible_indices = _get_visible_device_indices()
+                if idx >= len(visible_indices):
+                    continue
+                physical_idx = visible_indices[idx]
+
+                handle = pynvml.nvmlDeviceGetHandleByIndex(physical_idx)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                memory_free = mem_info.free
+                memory_total = mem_info.total
+                pynvml.nvmlShutdown()
+
+                # For OOM errors, check if this GPU has enough memory
+                if error_type == "OOM" and memory_needed > 0:
+                    if memory_free < memory_needed:
+                        logger.debug(
+                            f"Skipping cuda:{idx}: insufficient memory "
+                            f"({memory_free / 1e9:.2f} GB free, need {memory_needed / 1e9:.2f} GB)"
+                        )
+                        continue
+
+                candidates.append({
+                    "device": device_str,
+                    "memory_free": memory_free,
+                    "memory_total": memory_total,
+                })
+
+            except Exception as e:
+                logger.debug(f"Could not get info for cuda:{idx}: {e}")
+                # Still add as candidate with unknown memory
+                candidates.append({
+                    "device": device_str,
+                    "memory_free": 0,
+                    "memory_total": 0,
+                })
+
+        if not candidates:
+            logger.warning("No suitable GPU found for recovery")
+            return None
+
+        # Sort by free memory (descending) - prefer GPU with most free memory
+        candidates.sort(key=lambda x: x["memory_free"], reverse=True)
+
+        target = candidates[0]["device"]
+        logger.info(
+            f"Local recovery: selected {target} "
+            f"({candidates[0]['memory_free'] / 1e9:.2f} GB free)"
+        )
+        return target
+
+    except Exception as e:
+        logger.error(f"Failed to find local recovery target: {e}")
+        return None
+
+
 def _request_recovery_target(error_type: str, memory_needed: int = 0) -> Optional[str]:
-    """Request a recovery target GPU from orchestrator.
+    """Request a recovery target GPU from orchestrator or find one locally.
 
     Parameters:
         error_type: Type of error ("OOM", "ECC", etc.)
@@ -1620,26 +1724,24 @@ def _request_recovery_target(error_type: str, memory_needed: int = 0) -> Optiona
     """
     global _orchestrator_client, _process_id, _current_device, _physical_gpu_uuid
 
-    if _orchestrator_client is None:
-        logger.warning("Cannot request recovery: no orchestrator connection")
-        return None
+    # Try orchestrator first if connected
+    if _orchestrator_client is not None and not _orchestrator_client.connection_manager.is_local_mode:
+        result = _orchestrator_client.request_error_recovery(
+            process_id=_process_id,
+            error_type=error_type,
+            current_device=_current_device,
+            memory_needed=memory_needed,
+            current_gpu_uuid=_physical_gpu_uuid,
+        )
 
-    if _orchestrator_client.connection_manager.is_local_mode:
-        logger.warning("Cannot request recovery: in local mode")
-        return None
+        if result and result.get("target_device"):
+            return result["target_device"]
 
-    result = _orchestrator_client.request_error_recovery(
-        process_id=_process_id,
-        error_type=error_type,
-        current_device=_current_device,
-        memory_needed=memory_needed,
-        current_gpu_uuid=_physical_gpu_uuid,
-    )
+        # Orchestrator didn't find a target, fall through to local search
+        logger.info("Orchestrator found no target, trying local GPU search")
 
-    if result and result.get("target_device"):
-        return result["target_device"]
-
-    return None
+    # Standalone mode or orchestrator didn't find target - search locally
+    return _request_recovery_target_local(error_type, memory_needed)
 
 
 class _RecoverableAttempt:
@@ -1922,6 +2024,8 @@ class recoverable:
 
     def _handle_recovery_simple(self) -> None:
         """Handle recovery for simple context manager (no retry count tracking)."""
+        global _failed_gpus, _current_device
+
         error_type = self._last_error_type
         error_msg = self._last_error_msg
 
@@ -1931,6 +2035,11 @@ class recoverable:
                 f"GPU error recovery requires migration support (driver 580+). "
                 f"Original error: {self._last_error}"
             )
+
+        # Mark current GPU as failed (for standalone mode tracking)
+        if _current_device:
+            _failed_gpus.add(_current_device)
+            logger.debug(f"Marked {_current_device} as failed")
 
         # Clear CUDA error state
         _clear_cuda_error_state()
@@ -1942,7 +2051,7 @@ class recoverable:
             if memory_needed > 0:
                 logger.info(f"OOM: estimated {memory_needed / 1e9:.2f} GB needed")
 
-        # Request recovery target from orchestrator
+        # Request recovery target (orchestrator or local)
         target = _request_recovery_target(error_type, memory_needed)
 
         if target is None:
@@ -1963,6 +2072,8 @@ class recoverable:
 
     def _handle_recovery(self) -> None:
         """Handle recovery after a failed attempt."""
+        global _failed_gpus, _current_device
+
         error_type = self._last_error_type
         error_msg = self._last_error_msg
 
@@ -1983,6 +2094,11 @@ class recoverable:
                 f"Original error: {self._last_error}"
             ) from self._last_error
 
+        # Mark current GPU as failed (for standalone mode tracking)
+        if _current_device:
+            _failed_gpus.add(_current_device)
+            logger.debug(f"Marked {_current_device} as failed")
+
         # Clear CUDA error state
         _clear_cuda_error_state()
 
@@ -1993,7 +2109,7 @@ class recoverable:
             if memory_needed > 0:
                 logger.info(f"OOM: estimated {memory_needed / 1e9:.2f} GB needed")
 
-        # Request recovery target from orchestrator
+        # Request recovery target (orchestrator or local)
         target = _request_recovery_target(error_type, memory_needed)
 
         if target is None:

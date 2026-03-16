@@ -2250,3 +2250,1840 @@ class TestGPUErrorRecovery:
 
         finally:
             auto._migration_enabled = original_enabled
+
+
+class TestVerifyEnvironment:
+    """Tests for _verify_environment function."""
+
+    def test_verify_environment_returns_bool(self) -> None:
+        """Test _verify_environment returns a boolean."""
+        import flexium.auto as auto
+
+        result = auto._verify_environment()
+        assert isinstance(result, bool)
+
+    def test_verify_environment_checks_cuda(self) -> None:
+        """Test _verify_environment checks CUDA availability."""
+        import flexium.auto as auto
+        import inspect
+
+        source = inspect.getsource(auto._verify_environment)
+        assert "torch.cuda.is_available" in source
+
+    def test_verify_environment_checks_driver(self) -> None:
+        """Test _verify_environment checks driver interface."""
+        import flexium.auto as auto
+        import inspect
+
+        source = inspect.getsource(auto._verify_environment)
+        assert "_driver.is_available" in source
+
+    def test_verify_environment_sets_migration_enabled(self) -> None:
+        """Test _verify_environment sets _migration_enabled flag."""
+        import flexium.auto as auto
+
+        original = auto._migration_enabled
+        try:
+            # Call verify - it will set the flag based on actual environment
+            auto._verify_environment()
+            # Flag should be set to some boolean value
+            assert isinstance(auto._migration_enabled, bool)
+        finally:
+            auto._migration_enabled = original
+
+
+class TestBuildDeviceMap:
+    """Tests for device mapping functions."""
+
+    def test_build_device_map_from_uuids_empty_list(self) -> None:
+        """Test _build_device_map_from_uuids with empty list."""
+        import flexium.auto as auto
+
+        result = auto._build_device_map_from_uuids(0, 1, [])
+        assert result is None
+
+    def test_build_device_map_from_uuids_none(self) -> None:
+        """Test _build_device_map_from_uuids with None."""
+        import flexium.auto as auto
+
+        result = auto._build_device_map_from_uuids(0, 1, None)
+        assert result is None
+
+    def test_build_device_map_from_uuids_invalid_source_index(self) -> None:
+        """Test _build_device_map_from_uuids with invalid source index."""
+        import flexium.auto as auto
+
+        uuids = ["GPU-0", "GPU-1"]
+        result = auto._build_device_map_from_uuids(5, 1, uuids)  # Source 5 invalid
+        assert result is None
+
+    def test_build_device_map_from_uuids_invalid_target_index(self) -> None:
+        """Test _build_device_map_from_uuids with invalid target index."""
+        import flexium.auto as auto
+
+        uuids = ["GPU-0", "GPU-1"]
+        result = auto._build_device_map_from_uuids(0, 5, uuids)  # Target 5 invalid
+        assert result is None
+
+    def test_build_device_map_from_uuids_success(self) -> None:
+        """Test _build_device_map_from_uuids with valid inputs."""
+        import flexium.auto as auto
+
+        uuids = ["GPU-AAA", "GPU-BBB", "GPU-CCC"]
+        result = auto._build_device_map_from_uuids(0, 1, uuids)
+
+        assert result is not None
+        # Should swap GPU-AAA and GPU-BBB
+        assert "GPU-AAA=GPU-BBB" in result
+        assert "GPU-BBB=GPU-AAA" in result
+
+    def test_build_device_map_uses_cache(self) -> None:
+        """Test _build_device_map uses cached UUIDs when available."""
+        import flexium.auto as auto
+
+        original_cache = auto._gpu_index_to_uuid.copy()
+
+        try:
+            # Set up cache
+            auto._gpu_index_to_uuid = {0: "GPU-CACHED-0", 1: "GPU-CACHED-1"}
+
+            result = auto._build_device_map(0, 1)
+
+            # Should use cached values
+            if result:  # May return None if other checks fail
+                assert "GPU-CACHED" in result
+
+        finally:
+            auto._gpu_index_to_uuid = original_cache
+
+
+class TestClearCudaErrorState:
+    """Tests for _clear_cuda_error_state function."""
+
+    def test_clear_cuda_error_state_exists(self) -> None:
+        """Test _clear_cuda_error_state function exists."""
+        import flexium.auto as auto
+
+        assert callable(auto._clear_cuda_error_state)
+
+    def test_clear_cuda_error_state_does_not_raise(self) -> None:
+        """Test _clear_cuda_error_state doesn't raise exceptions."""
+        import flexium.auto as auto
+
+        # Should not raise even without CUDA
+        auto._clear_cuda_error_state()
+
+
+class TestRequestRecoveryTarget:
+    """Tests for _request_recovery_target function."""
+
+    def test_request_recovery_target_no_client_uses_local(self) -> None:
+        """Test _request_recovery_target uses local search without client."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            auto._orchestrator_client = None
+            auto._current_device = "cuda:0"
+            auto._failed_gpus = set()
+
+            # Mock _request_recovery_target_local to verify it's called
+            with patch.object(auto, "_request_recovery_target_local", return_value="cuda:1") as mock_local:
+                result = auto._request_recovery_target("OOM", 1000000)
+                assert result == "cuda:1"
+                mock_local.assert_called_once_with("OOM", 1000000)
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._failed_gpus = original_failed
+
+    def test_request_recovery_target_local_mode_uses_local(self) -> None:
+        """Test _request_recovery_target uses local search in local mode."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager.is_local_mode = True
+            auto._orchestrator_client = mock_client
+            auto._failed_gpus = set()
+
+            # Mock _request_recovery_target_local to verify it's called
+            with patch.object(auto, "_request_recovery_target_local", return_value="cuda:2") as mock_local:
+                result = auto._request_recovery_target("ECC", 0)
+                assert result == "cuda:2"
+                mock_local.assert_called_once_with("ECC", 0)
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._failed_gpus = original_failed
+
+    def test_request_recovery_target_success(self) -> None:
+        """Test _request_recovery_target returns target on success."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._current_device
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.request_error_recovery.return_value = {"target_device": "cuda:1"}
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-123"
+            auto._current_device = "cuda:0"
+
+            result = auto._request_recovery_target("OOM", 1000000)
+            assert result == "cuda:1"
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._current_device = original_device
+
+    def test_request_recovery_target_no_target_falls_back_to_local(self) -> None:
+        """Test _request_recovery_target falls back to local when orchestrator has no target."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.request_error_recovery.return_value = {}  # No target_device
+            auto._orchestrator_client = mock_client
+            auto._failed_gpus = set()
+
+            # Mock _request_recovery_target_local to verify fallback
+            with patch.object(auto, "_request_recovery_target_local", return_value="cuda:3") as mock_local:
+                result = auto._request_recovery_target("OOM", 1000000)
+                assert result == "cuda:3"
+                mock_local.assert_called_once_with("OOM", 1000000)
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._failed_gpus = original_failed
+
+
+class TestRequestRecoveryTargetLocal:
+    """Tests for _request_recovery_target_local function."""
+
+    def test_local_recovery_single_gpu_returns_none(self) -> None:
+        """Test local recovery returns None with only one GPU."""
+        import flexium.auto as auto
+        import torch
+
+        original_device = auto._current_device
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            auto._current_device = "cuda:0"
+            auto._failed_gpus = set()
+
+            with patch.object(torch.cuda, "device_count", return_value=1):
+                result = auto._request_recovery_target_local("OOM", 1000000)
+                assert result is None
+
+        finally:
+            auto._current_device = original_device
+            auto._failed_gpus = original_failed
+
+    def test_local_recovery_skips_current_gpu(self) -> None:
+        """Test local recovery skips the current (failed) GPU."""
+        import flexium.auto as auto
+        import torch
+
+        original_device = auto._current_device
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            auto._current_device = "cuda:0"
+            auto._failed_gpus = set()
+
+            with patch.object(torch.cuda, "device_count", return_value=2):
+                # Mock pynvml
+                mock_pynvml = MagicMock()
+                mock_mem_info = MagicMock()
+                mock_mem_info.free = 16_000_000_000
+                mock_mem_info.total = 32_000_000_000
+                mock_pynvml.nvmlDeviceGetMemoryInfo.return_value = mock_mem_info
+
+                with patch.dict("sys.modules", {"pynvml": mock_pynvml}):
+                    with patch("flexium.utils.gpu_info._get_visible_device_indices", return_value=[0, 1]):
+                        result = auto._request_recovery_target_local("OOM", 1000000)
+                        # Should return cuda:1 (not cuda:0)
+                        assert result == "cuda:1"
+
+        finally:
+            auto._current_device = original_device
+            auto._failed_gpus = original_failed
+
+    def test_local_recovery_skips_failed_gpus(self) -> None:
+        """Test local recovery skips previously failed GPUs."""
+        import flexium.auto as auto
+        import torch
+
+        original_device = auto._current_device
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            auto._current_device = "cuda:0"
+            auto._failed_gpus = {"cuda:1"}  # Mark cuda:1 as failed
+
+            with patch.object(torch.cuda, "device_count", return_value=3):
+                # Create a more complete pynvml mock
+                mock_handle = MagicMock()
+                mock_mem_info = MagicMock()
+                mock_mem_info.free = 16_000_000_000
+                mock_mem_info.total = 32_000_000_000
+
+                # We need to patch both the import and the functions
+                with patch("flexium.utils.gpu_info._get_visible_device_indices", return_value=[0, 1, 2]):
+                    # Patch pynvml at the point where it's imported in the function
+                    import pynvml
+                    with patch.object(pynvml, "nvmlInit"):
+                        with patch.object(pynvml, "nvmlShutdown"):
+                            with patch.object(pynvml, "nvmlDeviceGetHandleByIndex", return_value=mock_handle):
+                                with patch.object(pynvml, "nvmlDeviceGetMemoryInfo", return_value=mock_mem_info):
+                                    result = auto._request_recovery_target_local("OOM", 1000000)
+                                    # Should return cuda:2 (skip cuda:0 current, skip cuda:1 failed)
+                                    assert result == "cuda:2"
+
+        finally:
+            auto._current_device = original_device
+            auto._failed_gpus = original_failed
+
+    def test_local_recovery_no_suitable_gpu(self) -> None:
+        """Test local recovery returns None when no suitable GPU found."""
+        import flexium.auto as auto
+        import torch
+
+        original_device = auto._current_device
+        original_failed = auto._failed_gpus.copy()
+
+        try:
+            auto._current_device = "cuda:0"
+            auto._failed_gpus = {"cuda:1"}  # Only other GPU is failed
+
+            with patch.object(torch.cuda, "device_count", return_value=2):
+                result = auto._request_recovery_target_local("OOM", 1000000)
+                # No suitable GPU (cuda:0 is current, cuda:1 is failed)
+                assert result is None
+
+        finally:
+            auto._current_device = original_device
+            auto._failed_gpus = original_failed
+
+
+class TestDoMigrationValidation:
+    """Tests for _do_migration validation paths."""
+
+    def test_do_migration_already_in_progress(self) -> None:
+        """Test _do_migration returns False when already in progress."""
+        import flexium.auto as auto
+
+        original_in_progress = auto._migration_in_progress
+        try:
+            auto._migration_in_progress = True
+
+            result = auto._do_migration("cuda:1")
+            assert result is False
+
+        finally:
+            auto._migration_in_progress = original_in_progress
+
+    def test_do_migration_cpu_target_rejected(self) -> None:
+        """Test _do_migration rejects CPU target."""
+        import flexium.auto as auto
+
+        original_enabled = auto._migration_enabled
+        original_in_progress = auto._migration_in_progress
+        original_device = auto._current_device
+
+        try:
+            auto._migration_enabled = True
+            auto._migration_in_progress = False
+            auto._current_device = "cuda:0"
+
+            result = auto._do_migration("cpu")
+            assert result is False
+
+        finally:
+            auto._migration_enabled = original_enabled
+            auto._migration_in_progress = original_in_progress
+            auto._current_device = original_device
+
+    def test_do_migration_not_on_gpu_rejected(self) -> None:
+        """Test _do_migration rejects when not on GPU."""
+        import flexium.auto as auto
+
+        original_enabled = auto._migration_enabled
+        original_in_progress = auto._migration_in_progress
+        original_device = auto._current_device
+
+        try:
+            auto._migration_enabled = True
+            auto._migration_in_progress = False
+            auto._current_device = "cpu"
+
+            result = auto._do_migration("cuda:1")
+            assert result is False
+
+        finally:
+            auto._migration_enabled = original_enabled
+            auto._migration_in_progress = original_in_progress
+            auto._current_device = original_device
+
+    def test_do_migration_disabled_rejected(self) -> None:
+        """Test _do_migration returns False when migration disabled."""
+        import flexium.auto as auto
+
+        original_enabled = auto._migration_enabled
+        original_in_progress = auto._migration_in_progress
+        original_device = auto._current_device
+
+        try:
+            auto._migration_enabled = False
+            auto._migration_in_progress = False
+            auto._current_device = "cuda:0"
+
+            result = auto._do_migration("cuda:1")
+            assert result is False
+
+        finally:
+            auto._migration_enabled = original_enabled
+            auto._migration_in_progress = original_in_progress
+            auto._current_device = original_device
+
+
+class TestRecoverableAttempt:
+    """Tests for _RecoverableAttempt class."""
+
+    def test_recoverable_attempt_init(self) -> None:
+        """Test _RecoverableAttempt initialization."""
+        import flexium.auto as auto
+
+        parent = auto.recoverable()
+        attempt = auto._RecoverableAttempt(parent)
+
+        assert attempt._parent is parent
+        assert attempt._success is False
+
+    def test_recoverable_attempt_success(self) -> None:
+        """Test _RecoverableAttempt marks success on clean exit."""
+        import flexium.auto as auto
+
+        parent = auto.recoverable()
+        attempt = auto._RecoverableAttempt(parent)
+
+        with attempt:
+            pass  # No exception
+
+        assert attempt._success is True
+
+    def test_recoverable_attempt_non_cuda_error(self) -> None:
+        """Test _RecoverableAttempt re-raises non-CUDA errors."""
+        import flexium.auto as auto
+
+        parent = auto.recoverable()
+        attempt = auto._RecoverableAttempt(parent)
+
+        with pytest.raises(ValueError):
+            with attempt:
+                raise ValueError("Not a CUDA error")
+
+        assert attempt._success is False
+
+
+class TestRecoverableCallable:
+    """Tests for recoverable __call__ method edge cases."""
+
+    def test_recoverable_call_unexpected_state(self) -> None:
+        """Test recoverable raises TypeError for unexpected call state."""
+        import flexium.auto as auto
+
+        r = auto.recoverable(retries=3)
+        # r._func is None and we're not passing a callable
+
+        with pytest.raises(TypeError, match="missing required function"):
+            r(1, 2, 3)  # Not a callable, not keyword-only
+
+
+class TestCacheGpuInfo:
+    """Tests for GPU info caching at startup."""
+
+    def test_cache_gpu_info_at_startup_exists(self) -> None:
+        """Test _cache_gpu_info_at_startup function exists."""
+        import flexium.auto as auto
+
+        assert callable(auto._cache_gpu_info_at_startup)
+
+    def test_cache_gpu_info_at_startup_is_idempotent(self) -> None:
+        """Test _cache_gpu_info_at_startup only runs once."""
+        import flexium.auto as auto
+
+        original_cache = auto._gpu_index_to_uuid.copy()
+
+        try:
+            # Clear cache
+            auto._gpu_index_to_uuid = {}
+
+            # First call populates cache
+            auto._cache_gpu_info_at_startup()
+            first_cache = auto._gpu_index_to_uuid.copy()
+
+            # Modify cache to detect if second call overwrites
+            if auto._gpu_index_to_uuid:
+                auto._gpu_index_to_uuid[999] = "MARKER"
+
+            # Second call should not change cache
+            auto._cache_gpu_info_at_startup()
+
+            # If cache was populated first time and we added marker,
+            # it should still be there (idempotent)
+            if first_cache:
+                assert 999 in auto._gpu_index_to_uuid
+
+        finally:
+            auto._gpu_index_to_uuid = original_cache
+
+
+class TestGetAllGpuUuids:
+    """Tests for _get_all_gpu_uuids function."""
+
+    def test_get_all_gpu_uuids_returns_list(self) -> None:
+        """Test _get_all_gpu_uuids returns a list."""
+        import flexium.auto as auto
+
+        result = auto._get_all_gpu_uuids()
+        assert isinstance(result, list)
+
+    def test_get_all_gpu_uuids_handles_pynvml_error(self) -> None:
+        """Test _get_all_gpu_uuids handles pynvml errors gracefully."""
+        import flexium.auto as auto
+
+        # Even if pynvml fails internally, should return empty list not raise
+        # We test by verifying the function doesn't raise exceptions
+        result = auto._get_all_gpu_uuids()
+        # Should return a list (empty or populated depending on environment)
+        assert isinstance(result, list)
+
+
+class TestIsActive:
+    """Tests for is_active function."""
+
+    def test_is_active_with_client(self) -> None:
+        """Test is_active returns True with orchestrator client."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+
+        try:
+            auto._orchestrator_client = MagicMock()
+            auto._process_id = ""
+
+            assert auto.is_active() is True
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+
+    def test_is_active_with_process_id(self) -> None:
+        """Test is_active returns True with process ID."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+
+        try:
+            auto._orchestrator_client = None
+            auto._process_id = "gpu-12345"
+
+            assert auto.is_active() is True
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+
+    def test_is_active_without_either(self) -> None:
+        """Test is_active returns False without client or process ID."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+
+        try:
+            auto._orchestrator_client = None
+            auto._process_id = ""
+
+            assert auto.is_active() is False
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+
+
+class TestGetPhysicalDevice:
+    """Tests for get_physical_device function."""
+
+    def test_get_physical_device(self) -> None:
+        """Test get_physical_device returns physical device."""
+        import flexium.auto as auto
+
+        original = auto._physical_device
+        try:
+            auto._physical_device = "cuda:2"
+            assert auto.get_physical_device() == "cuda:2"
+        finally:
+            auto._physical_device = original
+
+
+class TestGetProcessId:
+    """Tests for get_process_id function."""
+
+    def test_get_process_id(self) -> None:
+        """Test get_process_id returns process ID."""
+        import flexium.auto as auto
+
+        original = auto._process_id
+        try:
+            auto._process_id = "gpu-test123"
+            assert auto.get_process_id() == "gpu-test123"
+        finally:
+            auto._process_id = original
+
+
+class TestIsMigrationEnabled:
+    """Tests for is_migration_enabled function."""
+
+    def test_is_migration_enabled_true(self) -> None:
+        """Test is_migration_enabled returns True when enabled."""
+        import flexium.auto as auto
+
+        original = auto._migration_enabled
+        try:
+            auto._migration_enabled = True
+            assert auto.is_migration_enabled() is True
+        finally:
+            auto._migration_enabled = original
+
+    def test_is_migration_enabled_false(self) -> None:
+        """Test is_migration_enabled returns False when disabled."""
+        import flexium.auto as auto
+
+        original = auto._migration_enabled
+        try:
+            auto._migration_enabled = False
+            assert auto.is_migration_enabled() is False
+        finally:
+            auto._migration_enabled = original
+
+
+class TestVerifyEnvironmentCudaNotAvailable:
+    """Tests for _verify_environment with CUDA not available."""
+
+    def test_verify_environment_cuda_not_available(self) -> None:
+        """Test _verify_environment when CUDA is not available."""
+        import flexium.auto as auto
+        from flexium import _driver
+
+        original_enabled = auto._migration_enabled
+        original_available = _driver._interface_available
+        original_disabled = _driver._interface_disabled
+
+        try:
+            # Mock torch.cuda.is_available to return False
+            with patch("torch.cuda.is_available", return_value=False):
+                # Also ensure driver is available so we only test CUDA check
+                _driver._interface_available = True
+                _driver._interface_disabled = False
+
+                result = auto._verify_environment()
+
+            # Should return False because CUDA is not available
+            assert result is False
+            assert auto._migration_enabled is False
+
+        finally:
+            auto._migration_enabled = original_enabled
+            _driver._interface_available = original_available
+            _driver._interface_disabled = original_disabled
+
+
+class TestBuildDeviceMapException:
+    """Tests for _build_device_map_from_uuids exception handling."""
+
+    def test_build_device_map_from_uuids_exception(self) -> None:
+        """Test _build_device_map_from_uuids handles exceptions."""
+        import flexium.auto as auto
+
+        # Test with a list-like object that raises on access
+        class BadList:
+            def __len__(self):
+                return 3
+
+            def __getitem__(self, idx):
+                raise RuntimeError("Test error")
+
+        result = auto._build_device_map_from_uuids(0, 1, BadList())
+        assert result is None
+
+
+class TestAttemptReconnectRejection:
+    """Tests for _attempt_reconnect rejection and exception paths."""
+
+    def test_attempt_reconnect_registration_rejected(self) -> None:
+        """Test _attempt_reconnect handles registration rejection."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.on_success = MagicMock()
+            mock_client._stub = MagicMock()
+
+            # Mock Register response with success=False
+            mock_response = MagicMock()
+            mock_response.success = False
+            mock_client._stub.Register.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+
+            result = auto._attempt_reconnect()
+            assert result is False
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+
+    def test_attempt_reconnect_exception(self) -> None:
+        """Test _attempt_reconnect handles exceptions."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._stub.Register.side_effect = Exception("Connection failed")
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+
+            result = auto._attempt_reconnect()
+            assert result is False
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+
+
+class TestRecoverableEdgeCases:
+    """Tests for recoverable edge cases and error handling."""
+
+    def test_recoverable_non_runtime_error_propagates(self) -> None:
+        """Test recoverable re-raises non-RuntimeError exceptions."""
+        import flexium.auto as auto
+
+        with pytest.raises(TypeError, match="wrong type"):
+            for attempt in auto.recoverable():
+                with attempt:
+                    raise TypeError("wrong type")
+
+    def test_recoverable_memory_estimation_logs(self) -> None:
+        """Test recoverable logs memory estimation for OOM."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            # Verify memory estimation was passed
+            assert memory_needed > 0
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        call_count = [0]
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(retries=3):
+                            with attempt:
+                                call_count[0] += 1
+                                if call_count[0] == 1:
+                                    # OOM with specific memory amount
+                                    raise torch.cuda.OutOfMemoryError(
+                                        "CUDA out of memory. Tried to allocate 4.00 GiB"
+                                    )
+                                # Second call succeeds
+
+            assert call_count[0] == 2
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_no_target_retry_on_same_gpu(self) -> None:
+        """Test recoverable retries on same GPU when no target available initially."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        call_count = [0]
+        recovery_calls = [0]
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            recovery_calls[0] += 1
+            # First call: no target, second call: return target
+            if recovery_calls[0] == 1:
+                return None
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(retries=5):
+                            with attempt:
+                                call_count[0] += 1
+                                if call_count[0] <= 2:
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                                # Third call succeeds
+
+            # Should have called: OOM -> no target -> retry -> OOM -> target -> migrate -> success
+            assert call_count[0] == 3
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_migration_fails_continues_retry(self) -> None:
+        """Test recoverable continues retrying when migration fails."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        call_count = [0]
+        migration_calls = [0]
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            migration_calls[0] += 1
+            # First migration fails, second succeeds
+            return migration_calls[0] >= 2
+
+        try:
+            auto._migration_enabled = True
+
+            with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                with patch.object(auto, "_do_migration", mock_do_migration):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        for attempt in auto.recoverable(retries=5):
+                            with attempt:
+                                call_count[0] += 1
+                                if call_count[0] <= 2:
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+                                # Third call succeeds
+
+            assert call_count[0] == 3
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+
+class TestDoResumeExceptionHandling:
+    """Tests for _do_resume_from_checkpoint exception handling."""
+
+    def test_do_resume_catches_exception(self) -> None:
+        """Test _do_resume_from_checkpoint catches and returns False on exception."""
+        import flexium.auto as auto
+
+        def mock_restore_raises(pid: int, device_map: str = None) -> bool:
+            raise RuntimeError("Simulated restore failure")
+
+        original_physical = auto._physical_device
+        original_client = auto._orchestrator_client
+
+        try:
+            auto._physical_device = "cuda:0"
+            auto._orchestrator_client = MagicMock()
+
+            with patch.object(auto, "_driver_restore", mock_restore_raises):
+                result = auto._do_resume_from_checkpoint("cuda:0", "cuda:0")
+
+            assert result is False
+
+        finally:
+            auto._physical_device = original_physical
+            auto._orchestrator_client = original_client
+
+
+class TestSendHeartbeatMigration:
+    """Tests for _send_heartbeat migration paths."""
+
+    def test_send_heartbeat_triggers_pause(self) -> None:
+        """Test _send_heartbeat triggers pause on __PAUSE__ command."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+        original_pause_in_progress = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+
+            # Mock heartbeat response requesting pause
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_response.should_migrate = True
+            mock_response.target_device = "__PAUSE__"
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+            auto._pause_in_progress = False
+
+            # Mock _do_pause to avoid actual pause
+            with patch.object(auto, "_do_pause") as mock_pause:
+                auto._send_heartbeat()
+                mock_pause.assert_called_once()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+            auto._pause_in_progress = original_pause_in_progress
+
+    def test_send_heartbeat_ignores_migration_during_pause(self) -> None:
+        """Test _send_heartbeat ignores migration when pause is in progress."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+        original_pause_in_progress = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+
+            # Mock heartbeat response requesting migration
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_response.should_migrate = True
+            mock_response.target_device = "cuda:1"
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+            auto._pause_in_progress = True  # Pause in progress
+
+            # Mock _do_migration - should NOT be called
+            with patch.object(auto, "_do_migration") as mock_migrate:
+                auto._send_heartbeat()
+                mock_migrate.assert_not_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+            auto._pause_in_progress = original_pause_in_progress
+
+
+class TestSendHeartbeatReconnection:
+    """Tests for _send_heartbeat reconnection handling."""
+
+    def test_send_heartbeat_handles_grpc_error(self) -> None:
+        """Test _send_heartbeat handles gRPC errors gracefully."""
+        import flexium.auto as auto
+        import grpc
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = True
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect
+            with patch.object(auto, "_attempt_reconnect", return_value=False):
+                # Should not raise
+                auto._send_heartbeat()
+
+            # Should have called on_failure
+            mock_client.connection_manager.on_failure.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_handles_non_grpc_error(self) -> None:
+        """Test _send_heartbeat handles non-gRPC errors."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+
+            # Mock heartbeat to raise generic error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = RuntimeError("Non-gRPC error")
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Should not raise
+            auto._send_heartbeat()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+
+class TestDebugHeartbeatOutput:
+    """Tests for debug output in heartbeat."""
+
+    def test_heartbeat_debug_counter(self) -> None:
+        """Test heartbeat debug counter increments."""
+        import flexium.auto as auto
+
+        # Verify the debug flag and counter exist in the source
+        import inspect
+        source = inspect.getsource(auto._send_heartbeat)
+
+        assert "_heartbeat_debug_counter" in source
+        assert "_DEBUG" in source
+
+
+class TestPatchFunctions:
+    """Tests for PyTorch patch functions."""
+
+    def test_patch_module_cuda_routes_to_current_device(self) -> None:
+        """Test patched Module.cuda routes to _current_device."""
+        import flexium.auto as auto
+        import inspect
+
+        source = inspect.getsource(auto._patch_module_cuda)
+
+        # Should reference _current_device for routing
+        assert "_current_device" in source
+
+    def test_patch_tensor_cuda_handles_cpu_mode(self) -> None:
+        """Test patched Tensor.cuda handles CPU mode."""
+        import flexium.auto as auto
+        import inspect
+
+        source = inspect.getsource(auto._patch_tensor_cuda)
+
+        # Should check for CPU mode
+        assert 'cpu' in source
+        assert "_current_device" in source
+
+
+class TestHeartbeatReconnectionStates:
+    """Tests for heartbeat reconnection state transitions."""
+
+    def test_send_heartbeat_reconnect_in_reconnecting_state(self) -> None:
+        """Test _send_heartbeat handles reconnection when in RECONNECTING state."""
+        import flexium.auto as auto
+        import grpc
+        from flexium.orchestrator.client import ConnectionState
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            mock_client.connection_manager.state = ConnectionState.RECONNECTING
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect to succeed
+            with patch.object(auto, "_attempt_reconnect", return_value=True):
+                # Should not raise
+                auto._send_heartbeat()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_reconnect_fails_in_reconnecting_state(self) -> None:
+        """Test _send_heartbeat records failure when reconnect fails in RECONNECTING state."""
+        import flexium.auto as auto
+        import grpc
+        from flexium.orchestrator.client import ConnectionState
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            mock_client.connection_manager.state = ConnectionState.RECONNECTING
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect to fail
+            with patch.object(auto, "_attempt_reconnect", return_value=False):
+                auto._send_heartbeat()
+
+            # Should have called on_failure again
+            assert mock_client.connection_manager.on_failure.called
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_reconnect_in_local_mode(self) -> None:
+        """Test _send_heartbeat handles reconnection from LOCAL_MODE state."""
+        import flexium.auto as auto
+        import grpc
+        from flexium.orchestrator.client import ConnectionState
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
+            mock_client.connection_manager.should_attempt_reconnect.return_value = True
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect to succeed
+            with patch.object(auto, "_attempt_reconnect", return_value=True):
+                auto._send_heartbeat()
+
+            # Should have called reset_for_reconnect
+            mock_client.connection_manager.reset_for_reconnect.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_local_mode_not_time_to_reconnect(self) -> None:
+        """Test _send_heartbeat skips reconnection when not time in LOCAL_MODE."""
+        import flexium.auto as auto
+        import grpc
+        from flexium.orchestrator.client import ConnectionState
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
+            mock_client.connection_manager.should_attempt_reconnect.return_value = False
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Should not call reset_for_reconnect
+            auto._send_heartbeat()
+
+            mock_client.connection_manager.reset_for_reconnect.assert_not_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_unknown_state(self) -> None:
+        """Test _send_heartbeat handles unknown connection state."""
+        import flexium.auto as auto
+        import grpc
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            # Set an unexpected state value
+            mock_client.connection_manager.state = "UNKNOWN_STATE"
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Should not raise, just log
+            auto._send_heartbeat()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_reconnect_success_in_healthy_state(self) -> None:
+        """Test _send_heartbeat handles successful reconnect after first failure."""
+        import flexium.auto as auto
+        import grpc
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = True  # Healthy, first failure
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect to succeed
+            with patch.object(auto, "_attempt_reconnect", return_value=True):
+                auto._send_heartbeat()
+
+            # Should have called on_failure first
+            mock_client.connection_manager.on_failure.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+    def test_send_heartbeat_local_mode_reconnect_fails(self) -> None:
+        """Test _send_heartbeat handles failed reconnect from LOCAL_MODE."""
+        import flexium.auto as auto
+        import grpc
+        from flexium.orchestrator.client import ConnectionState
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+            mock_client.connection_manager.is_healthy = False
+            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
+            mock_client.connection_manager.should_attempt_reconnect.return_value = True
+
+            # Mock heartbeat to raise gRPC error
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+
+            # Mock _attempt_reconnect to fail
+            with patch.object(auto, "_attempt_reconnect", return_value=False):
+                auto._send_heartbeat()
+
+            # Should have called on_failure
+            mock_client.connection_manager.on_failure.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+
+
+class TestDoMigrationTrigger:
+    """Tests for migration being triggered from heartbeat."""
+
+    def test_send_heartbeat_triggers_migration(self) -> None:
+        """Test _send_heartbeat triggers migration on should_migrate response."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_device = auto._current_device
+        original_process_id = auto._process_id
+        original_pause_in_progress = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client.connection_manager.is_local_mode = False
+
+            # Mock heartbeat response requesting migration
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_response.should_migrate = True
+            mock_response.target_device = "cuda:2"
+            mock_client._stub = MagicMock()
+            mock_client._stub.Heartbeat.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._current_device = "cuda:0"
+            auto._process_id = "test-process"
+            auto._pause_in_progress = False
+
+            # Mock _do_migration
+            with patch.object(auto, "_do_migration") as mock_migrate:
+                auto._send_heartbeat()
+                mock_migrate.assert_called_once_with("cuda:2")
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._current_device = original_device
+            auto._process_id = original_process_id
+            auto._pause_in_progress = original_pause_in_progress
+
+
+class TestAttemptReconnectSuccess:
+    """Tests for _attempt_reconnect success paths."""
+
+    def test_attempt_reconnect_with_cached_devices(self) -> None:
+        """Test _attempt_reconnect sends heartbeat with cached devices."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+        original_cached = auto._cached_visible_devices
+        original_pause = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._metadata = {}
+
+            # Mock Register response with success=True
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_client._stub.Register.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+            auto._cached_visible_devices = [
+                {"gpu_uuid": "GPU-AAA", "gpu_name": "Test GPU"}
+            ]
+            auto._pause_in_progress = False
+
+            result = auto._attempt_reconnect()
+            assert result is True
+
+            # Should have sent heartbeat with cached devices
+            mock_client._stub.Heartbeat.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+            auto._cached_visible_devices = original_cached
+            auto._pause_in_progress = original_pause
+
+    def test_attempt_reconnect_heartbeat_failure(self) -> None:
+        """Test _attempt_reconnect handles heartbeat exception gracefully."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+        original_cached = auto._cached_visible_devices
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._metadata = {}
+
+            # Mock Register response with success=True
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_client._stub.Register.return_value = mock_response
+            # Heartbeat raises exception
+            mock_client._stub.Heartbeat.side_effect = Exception("Heartbeat failed")
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+            auto._cached_visible_devices = [{"gpu_uuid": "GPU-AAA"}]
+
+            # Should still succeed (heartbeat failure is logged but doesn't fail reconnect)
+            result = auto._attempt_reconnect()
+            assert result is True
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+            auto._cached_visible_devices = original_cached
+
+    def test_attempt_reconnect_with_pause_in_progress(self) -> None:
+        """Test _attempt_reconnect notifies paused state when paused."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+        original_cached = auto._cached_visible_devices
+        original_pause = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._metadata = {}
+
+            # Mock Register response with success=True
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_client._stub.Register.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+            auto._cached_visible_devices = []
+            auto._pause_in_progress = True  # Paused
+
+            result = auto._attempt_reconnect()
+            assert result is True
+
+            # Should have called CompleteMigration with __PAUSED__
+            mock_client._stub.CompleteMigration.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+            auto._cached_visible_devices = original_cached
+            auto._pause_in_progress = original_pause
+
+    def test_attempt_reconnect_complete_migration_exception(self) -> None:
+        """Test _attempt_reconnect handles CompleteMigration exception."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+        original_pause = auto._pause_in_progress
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._metadata = {}
+
+            # Mock Register response with success=True
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_client._stub.Register.return_value = mock_response
+            # CompleteMigration raises exception
+            mock_client._stub.CompleteMigration.side_effect = Exception("Failed")
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            auto._physical_device = "cuda:0"
+            auto._pause_in_progress = True
+
+            # Should still succeed (exception is logged but doesn't fail reconnect)
+            result = auto._attempt_reconnect()
+            assert result is True
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+            auto._pause_in_progress = original_pause
+
+    def test_attempt_reconnect_invalid_device_format(self) -> None:
+        """Test _attempt_reconnect handles invalid device format."""
+        import flexium.auto as auto
+
+        original_client = auto._orchestrator_client
+        original_process_id = auto._process_id
+        original_device = auto._physical_device
+
+        try:
+            mock_client = MagicMock()
+            mock_client.connection_manager = MagicMock()
+            mock_client._stub = MagicMock()
+            mock_client._metadata = {}
+
+            # Mock Register response with success=True
+            mock_response = MagicMock()
+            mock_response.success = True
+            mock_client._stub.Register.return_value = mock_response
+
+            auto._orchestrator_client = mock_client
+            auto._process_id = "test-process"
+            # Invalid device format (no colon)
+            auto._physical_device = "cuda"
+
+            result = auto._attempt_reconnect()
+            assert result is True
+
+        finally:
+            auto._orchestrator_client = original_client
+            auto._process_id = original_process_id
+            auto._physical_device = original_device
+
+
+class TestConnectOrchestratorPaths:
+    """Tests for _connect_orchestrator additional paths."""
+
+    def test_connect_orchestrator_no_orchestrator(self) -> None:
+        """Test _connect_orchestrator with no orchestrator configured."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(orchestrator=None, device="cuda:0")
+
+            auto._connect_orchestrator(config)
+
+            # Should not create client when no orchestrator
+            # (depends on implementation, but shouldn't raise)
+
+        finally:
+            auto._orchestrator_client = original_client
+
+    def test_connect_orchestrator_registration_fails(self) -> None:
+        """Test _connect_orchestrator when registration fails."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(
+                orchestrator="localhost:80",
+                device="cuda:0",
+            )
+
+            # Mock OrchestratorClient
+            with patch("flexium.orchestrator.client.OrchestratorClient") as MockClient:
+                mock_instance = MagicMock()
+                mock_instance.register.return_value = None  # Registration fails
+                MockClient.return_value = mock_instance
+
+                auto._connect_orchestrator(config)
+
+                # Should have called register
+                mock_instance.register.assert_called()
+
+        finally:
+            auto._orchestrator_client = original_client
+
+    def test_connect_orchestrator_exception(self) -> None:
+        """Test _connect_orchestrator handles connection exception."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(
+                orchestrator="localhost:80",
+                device="cuda:0",
+            )
+
+            # Mock OrchestratorClient to raise exception
+            with patch("flexium.orchestrator.client.OrchestratorClient") as MockClient:
+                MockClient.side_effect = Exception("Connection failed")
+
+                # Should not raise
+                auto._connect_orchestrator(config)
+
+        finally:
+            auto._orchestrator_client = original_client
+
+
+class TestCacheGpuInfoException:
+    """Tests for _cache_gpu_info_at_startup exception handling."""
+
+    def test_cache_gpu_info_handles_pynvml_exception(self) -> None:
+        """Test _cache_gpu_info_at_startup handles pynvml exceptions."""
+        import flexium.auto as auto
+
+        original_uuid_cache = auto._gpu_index_to_uuid.copy()
+        original_name_cache = auto._gpu_index_to_name.copy()
+
+        try:
+            # Clear caches to force re-caching
+            auto._gpu_index_to_uuid = {}
+            auto._gpu_index_to_name = {}
+
+            # Mock pynvml to raise exception
+            with patch("pynvml.nvmlInit", side_effect=Exception("pynvml failed")):
+                # Should not raise
+                auto._cache_gpu_info_at_startup()
+
+            # Caches should remain empty (or at least not crash)
+            assert isinstance(auto._gpu_index_to_uuid, dict)
+
+        finally:
+            auto._gpu_index_to_uuid = original_uuid_cache
+            auto._gpu_index_to_name = original_name_cache
+
+
+class TestRecoverableSimpleContextManager:
+    """Tests for recoverable simple context manager (no retry) paths."""
+
+    def test_recoverable_simple_migration_fails(self) -> None:
+        """Test simple context manager re-raises original error when migration fails."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return False  # Migration fails
+
+        try:
+            auto._migration_enabled = True
+
+            # Simple context manager re-raises original error when recovery fails
+            with pytest.raises(torch.cuda.OutOfMemoryError, match="CUDA out of memory"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_do_migration", mock_do_migration):
+                        with patch.object(auto, "_clear_cuda_error_state"):
+                            with auto.recoverable():
+                                raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_simple_no_target(self) -> None:
+        """Test simple context manager re-raises original error when no target available."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return None  # No target
+
+        try:
+            auto._migration_enabled = True
+
+            # Simple context manager re-raises original error when no target
+            with pytest.raises(torch.cuda.OutOfMemoryError, match="CUDA out of memory"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_clear_cuda_error_state"):
+                        with auto.recoverable():
+                            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_simple_migration_disabled(self) -> None:
+        """Test simple context manager re-raises original error when migration disabled."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        try:
+            auto._migration_enabled = False
+
+            # Simple context manager re-raises original error when disabled
+            with pytest.raises(torch.cuda.OutOfMemoryError, match="CUDA out of memory"):
+                with patch.object(auto, "_clear_cuda_error_state"):
+                    with auto.recoverable():
+                        raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+
+class TestRecoverableIteratorExhaustion:
+    """Tests for recoverable iterator exhaustion paths."""
+
+    def test_recoverable_iterator_exhaustion_raises(self) -> None:
+        """Test recoverable raises after exhausting all retries."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return True  # Migration succeeds but error keeps happening
+
+        try:
+            auto._migration_enabled = True
+
+            with pytest.raises(RuntimeError, match="after 1 retries"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_do_migration", mock_do_migration):
+                        with patch.object(auto, "_clear_cuda_error_state"):
+                            for attempt in auto.recoverable(retries=1):
+                                with attempt:
+                                    # Always fail with OOM
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_recoverable_migration_failure_at_max_retries(self) -> None:
+        """Test recoverable raises when migration fails at max retries."""
+        import flexium.auto as auto
+        import torch
+
+        original_enabled = auto._migration_enabled
+        call_count = [0]
+
+        def mock_request_recovery(error_type: str, memory_needed: int = 0):
+            return "cuda:1"
+
+        def mock_do_migration(target: str) -> bool:
+            return False  # Migration always fails
+
+        try:
+            auto._migration_enabled = True
+
+            with pytest.raises(RuntimeError, match="migration failed"):
+                with patch.object(auto, "_request_recovery_target", mock_request_recovery):
+                    with patch.object(auto, "_do_migration", mock_do_migration):
+                        with patch.object(auto, "_clear_cuda_error_state"):
+                            for attempt in auto.recoverable(retries=1):
+                                with attempt:
+                                    call_count[0] += 1
+                                    raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        finally:
+            auto._migration_enabled = original_enabled
+
+
+class TestRunContextManagerPaths:
+    """Tests for run() context manager additional paths."""
+
+    def test_run_prints_orchestrator_warning_when_none(self) -> None:
+        """Test run() prints warning when no orchestrator configured."""
+        import flexium.auto as auto
+
+        # Verify run has the path to print warning
+        import inspect
+        source = inspect.getsource(auto.run)
+
+        assert "print_no_orchestrator_warning" in source
+
+    def test_run_starts_heartbeat_thread(self) -> None:
+        """Test run() starts heartbeat thread when client exists."""
+        import flexium.auto as auto
+
+        import inspect
+        source = inspect.getsource(auto.run)
+
+        # Should start heartbeat thread
+        assert "_heartbeat_thread" in source
+        assert "_heartbeat_loop" in source

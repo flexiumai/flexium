@@ -167,12 +167,19 @@ with flexium.auto.recoverable():
 ## Requirements
 
 - **Migration must be enabled** (NVIDIA driver 580+ required)
-- **Orchestrator connection** for finding alternative GPUs
 - **Multiple GPUs available** for recovery to work
 
 If migration is disabled or no alternative GPU is available:
 - Simple context manager: the original error is re-raised
 - Decorator/Iterator: retries are attempted, then the error is re-raised
+
+### Standalone Mode
+
+GPU error recovery works **with or without** an orchestrator connection:
+
+- **With orchestrator**: The orchestrator coordinates recovery, tracking GPU health across all processes and making smart decisions about which GPU to migrate to.
+
+- **Without orchestrator (standalone)**: Flexium finds an alternative GPU locally by scanning available GPUs, checking their free memory, and selecting the best candidate. Previously failed GPUs are tracked and avoided.
 
 ## How It Works
 
@@ -194,7 +201,7 @@ If migration is disabled or no alternative GPU is available:
 
 ## Limitations
 
-- Recovery requires an orchestrator connection (doesn't work in standalone mode)
 - Only works with supported CUDA error types
 - If all GPUs are exhausted or unsuitable, the error is eventually re-raised
 - Some errors (like ECC) may indicate hardware problems that affect all GPUs
+- In standalone mode (no orchestrator), there's no coordination between processes - if multiple processes hit errors simultaneously, they may all try to migrate to the same GPU
