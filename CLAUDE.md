@@ -50,3 +50,6 @@ with flexium.auto.run():
 Session logs are maintained in the flexium-server repository:
 - `flexium-server/sessions/flexium/` - Client-related sessions
 - `flexium-server/sessions/flexium-server/` - Server-related sessions
+
+To save a session, use `/save-session` - the skill is defined at:
+`flexium-server/.claude/skills/save-session.md`
