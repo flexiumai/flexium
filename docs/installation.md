@@ -177,7 +177,7 @@ Create `~/.flexiumrc`:
 
 ```yaml
 # Server address with workspace
-server: localhost:80/myworkspace
+server: flexium.ai:80/myworkspace
 
 # Default device
 device: cuda:0
@@ -199,7 +199,7 @@ Example:
 
 ```bash
 # Format: host:port/workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 export GPU_DEVICE=cuda:0
 export FLEXIUM_LOG_LEVEL=DEBUG
 ```
@@ -212,7 +212,7 @@ export FLEXIUM_LOG_LEVEL=DEBUG
 Create `.flexiumrc` in your project directory (takes precedence over `~/.flexiumrc`):
 
 ```yaml
-orchestrator: localhost:80
+server: flexium.ai:80/myworkspace
 device: cuda:0
 ```
 
@@ -251,7 +251,7 @@ pynvml.nvmlShutdown()
 
 ```bash
 # Set your server and workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 ```
 
 ### Step 4: Test Training Integration
@@ -269,7 +269,7 @@ with flexium.auto.run():
 EOF
 
 # Run test
-FLEXIUM_SERVER="localhost:80/myworkspace" python test_flexium.py
+FLEXIUM_SERVER="flexium.ai:80/myworkspace" python test_flexium.py
 ```
 
 ---

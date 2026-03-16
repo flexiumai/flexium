@@ -224,7 +224,7 @@ def is_migration_enabled() -> bool:
 #
 # When supported by the driver, Flexium can perform migrations that leave
 # absolutely no memory on the source GPU (zero VRAM residue). This is
-# achieved through proprietary driver-level capabilities.
+# achieved through driver-level capabilities (driver 580+).
 #
 # Requirements:
 # - NVIDIA driver 580 or higher

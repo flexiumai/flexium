@@ -224,55 +224,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
 ---
 
-### Scenario 4: Hardware Failure
-
-**The Problem:** A GPU develops ECC errors or fails during training. Your job crashes, you lose progress, and you have to manually identify the problem and restart.
-
-=== "❌ Without flexium"
-
-    ```python
-    # Training on cuda:2
-    model = Net().cuda()
-
-    for epoch in range(100):
-        for batch in dataloader:
-            # At epoch 23...
-            # RuntimeError: CUDA error: uncorrectable ECC error
-            #
-            # What now?
-            # 1. Check nvidia-smi - which GPU failed?
-            # 2. Manually restart on different GPU
-            # 3. Hope you had a recent checkpoint
-            # 4. Debug for hours figuring out the problem
-            pass
-    ```
-
-=== "✅ With flexium"
-
-    ```python
-    import flexium.auto
-
-    with flexium.auto.run():
-        model = Net().cuda()
-
-        for epoch in range(100):
-            for batch in dataloader:
-                # At epoch 23... ECC error detected!
-                # flexium automatically:
-                # 1. Catches the ECC error
-                # 2. Marks cuda:2 as unhealthy
-                # 3. Migrates to healthy GPU
-                # 4. Continues training
-                pass
-
-    # Dashboard shows cuda:2 with red "Unhealthy" badge
-    # Other jobs won't be scheduled there
-    # Admin can investigate and mark healthy when fixed
-    ```
-
----
-
-### Scenario 5: Preemption for Priority Jobs
+### Scenario 4: Preemption for Priority Jobs
 
 **The Problem:** An urgent inference job or deadline-critical training needs a GPU immediately, but all GPUs are occupied. You have to interrupt colleagues, wait, or miss your deadline.
 
@@ -344,7 +296,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
 ---
 
-### Scenario 6: Long-Running Experiments
+### Scenario 5: Long-Running Experiments
 
 **The Problem:** You're running a 2-week training job. Various things can go wrong: server reboots, driver updates, competing jobs, etc.
 
@@ -361,15 +313,9 @@ These examples show the pain points of GPU management **without** Flexium.AI and
             #
             # Day 7: Colleague needs your GPU urgently
             #        -> Have to stop, lose progress
-            #
-            # Day 10: OOM due to memory fragmentation
-            #         -> Job crashes, restart manually
-            #
-            # Day 12: GPU develops ECC errors
-            #         -> Job crashes, debug for hours
             pass
 
-    # Result: 2-week job actually takes 4 weeks due to failures
+    # Result: 2-week job takes longer due to interruptions
     ```
 
 === "✅ With flexium"
@@ -377,26 +323,20 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+    with flexium.auto.run():
         model = BigModel().cuda()
 
         for epoch in range(1000):
             for batch in dataloader:
                 # Day 3: Server reboots
-                #        -> Checkpoint saved, job resumes after reboot
+                #        -> Job paused, resumes after reboot
                 #
                 # Day 7: Colleague needs GPU
-                #        -> Admin migrates job to cuda:2, continues without interruption
-                #
-                # Day 10: OOM detected
-                #         -> Migrate to GPU with more VRAM
-                #
-                # Day 12: ECC error
-                #         -> Migrate to healthy GPU
+                #        -> Migrate job to cuda:2 via dashboard, continues without interruption
                 pass
 
     # Result: 2-week job completes in ~2 weeks
-    # Failures handled with migration
+    # Interruptions handled with migration via dashboard
     ```
 
 ---
@@ -406,11 +346,9 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 | Scenario | Without Flexium.AI | With Flexium.AI |
 |----------|---------------------|------------------|
 | GPU contention | Stop job, lose progress | Live migration, zero downtime |
-| OOM error | Job crashes, manual restart | Auto-recovery to bigger GPU |
-| Shared cluster | Slack messages, conflicts | Dashboard, CLI, organized |
-| Hardware failure | Debug + manual restart | Auto-migrate, mark unhealthy |
+| Shared cluster | Slack messages, conflicts | Dashboard, organized |
 | Priority preemption | Interrupt people, wait, miss deadline | Instant migration, no lost work |
-| Long jobs | Multiple failures | Resilient, auto-recovery |
+| Long jobs | Multiple interruptions | Resilient with migration |
 
 ---
 

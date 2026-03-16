@@ -448,9 +448,9 @@ class OrchestratorClient:
                     logger.warning(
                         f"Failed to register with orchestrator after {self.connection_manager._max_retries} "
                         f"retries, entering local mode.\n"
-                        f"  Hint: Check that orchestrator is running: flexium-ctl server --dashboard\n"
+                        f"  Hint: Check FLEXIUM_SERVER is set correctly: export FLEXIUM_SERVER='flexium.ai:80/yourworkspace'\n"
                         f"  Hint: Verify the address '{self.address}' is reachable\n"
-                        f"  Hint: Check for firewall rules blocking port {self.address.split(':')[-1]}\n"
+                        f"  Hint: Check for firewall rules blocking outbound connections\n"
                         f"  Training will continue without migration support."
                     )
                     return None

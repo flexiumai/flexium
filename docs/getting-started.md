@@ -98,7 +98,7 @@ That's it! Your training is now migration-enabled.
 
 ```bash
 # Set server address with workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 
 # Run your script normally
 python train.py
@@ -119,7 +119,7 @@ Open your workspace dashboard at [flexium.ai](https://flexium.ai) to:
 
 ```bash
 # Server with workspace (required)
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
 
 # Optional: default device
 export GPU_DEVICE=cuda:0
@@ -130,14 +130,14 @@ export GPU_DEVICE=cuda:0
 Create `~/.flexiumrc`:
 
 ```yaml
-server: localhost:80/myworkspace
+server: flexium.ai:80/myworkspace
 device: cuda:0
 ```
 
 ### Inline Parameters
 
 ```python
-with flexium.auto.run(orchestrator="localhost:80/myworkspace", device="cuda:0"):
+with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace", device="cuda:0"):
     ...
 ```
 
@@ -160,7 +160,7 @@ python -c "import flexium; print('OK')"
 
 1. Set your server connection:
    ```bash
-   export FLEXIUM_SERVER="localhost:80/myworkspace"
+   export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
    ```
 
 2. Run example:

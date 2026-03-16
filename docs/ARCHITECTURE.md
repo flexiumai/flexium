@@ -63,7 +63,7 @@ Flexium enables **live GPU migration** for PyTorch training jobs. Your training 
 
 ### In-Process Migration
 
-Unlike checkpoint-based approaches, Flexium migrates within the same process:
+Unlike traditional approaches, Flexium migrates within the same process:
 - No process restart required
 - Training continues from the exact same point
 - All Python state preserved (variables, loop counters, etc.)

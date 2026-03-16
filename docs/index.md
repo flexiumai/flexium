@@ -55,7 +55,6 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 - **Minimal Code Changes**: As few as 2 lines to integrate
 - **Remote Orchestration**: Manage GPUs across your cluster
 - **Web Dashboard**: Real-time monitoring and one-click migration
-- **GPU Error Recovery**: Automatic recovery from OOM, device assert, and ECC errors
 - **Graceful Degradation**: Works standalone without orchestrator (no single point of failure)
 - **GPU UUID Support**: Target specific physical GPUs for reproducibility
 
@@ -233,19 +232,6 @@ Free up a GPU for a larger model:
 ### Fault Tolerance
 
 If a GPU has issues, migrate affected jobs via dashboard - select each job and move to a healthy GPU.
-
-### Automatic GPU Error Recovery
-
-GPU errors (OOM, device assert, ECC) are automatically detected and trigger recovery:
-
-```python
-import flexium.auto
-
-with flexium.auto.run():
-    # If OOM occurs, automatically migrates to GPU with more VRAM
-    model = Net().cuda()
-    ...
-```
 
 ### Development Workflow
 
