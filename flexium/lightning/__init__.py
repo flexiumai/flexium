@@ -24,10 +24,8 @@ from __future__ import annotations
 
 try:
     from flexium.lightning.callback import FlexiumCallback
-except ImportError as e:
+except ImportError:
     # Provide helpful error if Lightning is not installed
-    import sys
-
     class FlexiumCallback:  # type: ignore[no-redef]
         """Placeholder that raises ImportError when instantiated."""
 
@@ -36,6 +34,6 @@ except ImportError as e:
                 "PyTorch Lightning is required for FlexiumCallback. "
                 "Install it with: pip install pytorch-lightning>=2.0.0 "
                 "or: pip install flexium[lightning]"
-            ) from e
+            )
 
 __all__ = ["FlexiumCallback"]

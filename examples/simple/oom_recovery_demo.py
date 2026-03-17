@@ -41,7 +41,7 @@ def demo_simple(total_gb: float) -> None:
     ]
 
     print(f"Processing {len(batches)} batches...")
-    print(f"Batch 3 will trigger OOM by allocating 30% of GPU\n")
+    print("Batch 3 will trigger OOM by allocating 30% of GPU\n")
 
     input("Press Enter to start processing batches...")
 
@@ -74,7 +74,7 @@ def demo_decorator(total_gb: float) -> None:
     batch_data = torch.randn(1000, 1000)
     batch_sum = batch_data.sum().item()
     print(f"Batch data created. CPU sum: {batch_sum:.4f}")
-    print(f"(We'll verify this same sum after migration)\n")
+    print("(We'll verify this same sum after migration)\n")
 
     @flexium.auto.recoverable(retries=3)
     def process_batch(data: torch.Tensor, trigger_oom: bool) -> float:
@@ -82,7 +82,7 @@ def demo_decorator(total_gb: float) -> None:
         print(f"   process_batch() on {device}, trigger_oom={trigger_oom}")
 
         if trigger_oom:
-            print(f"   Allocating 30% of GPU to trigger OOM...")
+            print("   Allocating 30% of GPU to trigger OOM...")
             _ = torch.zeros(int(total_gb * 0.3 * 1e9 / 4), dtype=torch.float32, device="cuda")
 
         gpu_data = data.cuda()
@@ -95,11 +95,11 @@ def demo_decorator(total_gb: float) -> None:
 
     result = process_batch(batch_data, trigger_oom=True)
 
-    print(f"\n=== RESULT ===")
+    print("\n=== RESULT ===")
     print(f"   Expected sum: {batch_sum:.2f}")
     print(f"   Got sum:      {result:.2f}")
     print(f"   Match: {round(batch_sum, 2) == round(result, 2)}")
-    print(f"   The SAME data was replayed on the new GPU!")
+    print("   The SAME data was replayed on the new GPU!")
 
 
 def demo_iterator(total_gb: float) -> None:
@@ -110,7 +110,7 @@ def demo_iterator(total_gb: float) -> None:
     batch_data = torch.randn(1000, 1000)
     batch_sum = batch_data.sum().item()
     print(f"Batch data created. CPU sum: {batch_sum:.4f}")
-    print(f"(We'll verify this same sum after migration)\n")
+    print("(We'll verify this same sum after migration)\n")
 
     print(f"Current device: {flexium.auto.get_physical_device()}")
     input("\nPress Enter to process batch (will OOM, migrate, and RETRY)...")
@@ -123,18 +123,18 @@ def demo_iterator(total_gb: float) -> None:
             print(f"\n   Attempt {attempt} on {device}")
 
             if attempt == 1:
-                print(f"   Allocating 30% of GPU to trigger OOM...")
+                print("   Allocating 30% of GPU to trigger OOM...")
                 _ = torch.zeros(int(total_gb * 0.3 * 1e9 / 4), dtype=torch.float32, device="cuda")
 
             gpu_data = batch_data.cuda()
             result = gpu_data.sum().item()
             print(f"   Computed sum: {result:.4f}")
 
-    print(f"\n=== RESULT ===")
+    print("\n=== RESULT ===")
     print(f"   Expected sum: {batch_sum:.2f}")
     print(f"   Got sum:      {result:.2f}")
     print(f"   Match: {round(batch_sum, 2) == round(result, 2)}")
-    print(f"   The SAME data was processed on the new GPU!")
+    print("   The SAME data was processed on the new GPU!")
 
 
 def main() -> None:

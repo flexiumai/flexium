@@ -226,7 +226,7 @@ def restore_state(pid: int, device_map: Optional[str] = None) -> bool:
             cmd.extend(["--device-map", device_map])
 
         logger.info(f"Restoring state for pid {pid}")
-        print(f"[flexium] Restoring GPU state...")
+        print("[flexium] Restoring GPU state...")
         sys.stdout.flush()
 
         result = subprocess.run(

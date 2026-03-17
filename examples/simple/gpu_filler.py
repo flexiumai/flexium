@@ -22,7 +22,7 @@ def main() -> None:
 
     print(f"Filling cuda:{args.device} with {fill_gb:.1f} GB ({args.fill_pct}%)...")
     filler = torch.zeros(int(fill_gb * 1e9 / 4), dtype=torch.float32, device=f"cuda:{args.device}")
-    print(f"Done. Press Ctrl+C to release memory and exit.")
+    print("Done. Press Ctrl+C to release memory and exit.")
 
     try:
         while True:

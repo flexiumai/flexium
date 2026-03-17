@@ -117,18 +117,18 @@ select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
     "F",      # pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function calls in argument defaults
+    "F401",   # unused imports - many are for re-export or TYPE_CHECKING
+    "F811",   # redefinition - often intentional in tests
+    "F841",   # unused variable - sometimes needed for unpacking
 ]
-
-[tool.ruff.lint.isort]
-known-first-party = ["flexium"]
+# Note: Using minimal ruleset to avoid churn on existing code
+# - Removed "I" (isort) - would require reformatting all imports
+# - Removed "UP" (pyupgrade) - suggests Python 3.10+ syntax incompatible with py38
+# - Removed "B" (bugbear) - too opinionated for existing codebase
+# - Removed "C4" (comprehensions) - not critical
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

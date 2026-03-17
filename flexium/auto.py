@@ -479,10 +479,10 @@ def _do_migration_with_driver(target_device: str) -> bool:
                 _migration_in_progress = False
                 return False
 
-            print(f"[flexium] GPU resources released from source")
+            print("[flexium] GPU resources released from source")
 
             # Step 3: Restore to target GPU
-            print(f"[flexium] Restoring to target GPU...")
+            print("[flexium] Restoring to target GPU...")
 
             if not _driver_restore(pid, device_map=device_map):
                 logger.error("Migration restore failed!")
@@ -528,7 +528,7 @@ def _do_migration_with_driver(target_device: str) -> bool:
             mem_reserved = torch.cuda.memory_reserved(source_idx)
             print(f"[flexium] Memory: {mem_allocated/1e6:.1f} MB allocated, {mem_reserved/1e6:.1f} MB reserved")
 
-            print(f"[flexium] === MIGRATION COMPLETE (zero VRAM residue) ===\n")
+            print("[flexium] === MIGRATION COMPLETE (zero VRAM residue) ===\n")
             sys.stdout.flush()
 
             # Notify orchestrator with the PHYSICAL device we're now on
@@ -584,7 +584,7 @@ def _do_migration(target_device: str) -> bool:
     # Check if migration is enabled (environment requirements met)
     if not _migration_enabled:
         logger.warning("Migration requested but disabled (requirements not met)")
-        print(f"[flexium] WARNING: Migration disabled - requirements for Flexium migration are not met.")
+        print("[flexium] WARNING: Migration disabled - requirements for Flexium migration are not met.")
         sys.stdout.flush()
         return False
 
@@ -592,7 +592,7 @@ def _do_migration(target_device: str) -> bool:
     if not target_device.startswith("cuda"):
         logger.error(f"Invalid migration target: {target_device}. Only GPU targets supported.")
         print(f"[flexium] ERROR: Invalid target '{target_device}'. Only GPU-to-GPU migration supported.")
-        print(f"[flexium] Use pause/resume to free GPU memory temporarily.")
+        print("[flexium] Use pause/resume to free GPU memory temporarily.")
         sys.stdout.flush()
         return False
 
@@ -606,8 +606,8 @@ def _do_migration(target_device: str) -> bool:
     # Check driver interface availability (redundant but explicit)
     if not _check_driver_interface_available():
         logger.error("Driver interface not available. Driver 580+ required for migration.")
-        print(f"[flexium] ERROR: Driver interface not available.")
-        print(f"[flexium] GPU migration requires NVIDIA driver 580+.")
+        print("[flexium] ERROR: Driver interface not available.")
+        print("[flexium] GPU migration requires NVIDIA driver 580+.")
         sys.stdout.flush()
         return False
 
@@ -650,7 +650,7 @@ def _do_pause() -> None:
     # Check if migration/pause is enabled (environment requirements met)
     if not _migration_enabled:
         logger.warning("Pause requested but disabled (requirements not met)")
-        print(f"[flexium] WARNING: Pause disabled - requirements for Flexium migration are not met.")
+        print("[flexium] WARNING: Pause disabled - requirements for Flexium migration are not met.")
         sys.stdout.flush()
         _pause_in_progress = False
         return
@@ -666,8 +666,8 @@ def _do_pause() -> None:
     # Check driver interface availability (redundant but explicit)
     if not _check_driver_interface_available():
         logger.error("Driver interface not available. Driver 580+ required for pause.")
-        print(f"[flexium] ERROR: Driver interface not available.")
-        print(f"[flexium] Pause requires NVIDIA driver 580+.")
+        print("[flexium] ERROR: Driver interface not available.")
+        print("[flexium] Pause requires NVIDIA driver 580+.")
         sys.stdout.flush()
         _pause_in_progress = False
         return
@@ -784,7 +784,7 @@ def _do_pause() -> None:
             except grpc.RpcError as e:
                 # gRPC connection error - attempt reconnection
                 logger.warning(f"Pause heartbeat gRPC error: {e}")
-                print(f"[flexium] Lost connection to orchestrator during pause")
+                print("[flexium] Lost connection to orchestrator during pause")
                 sys.stdout.flush()
 
                 # Try to reconnect with timeout, then auto-resume if orchestrator stays down
@@ -809,10 +809,10 @@ def _do_pause() -> None:
                         )
 
                         if success:
-                            print(f"[flexium] === AUTO-RESUMED (local mode) ===")
-                            print(f"[flexium] Running without orchestrator. Will reconnect when available.")
+                            print("[flexium] === AUTO-RESUMED (local mode) ===")
+                            print("[flexium] Running without orchestrator. Will reconnect when available.")
                         else:
-                            print(f"[flexium] WARNING: Auto-resume failed!")
+                            print("[flexium] WARNING: Auto-resume failed!")
 
                         sys.stdout.flush()
                         _pause_in_progress = False
@@ -822,7 +822,7 @@ def _do_pause() -> None:
                     sys.stdout.flush()
 
                     if _attempt_reconnect():
-                        print(f"[flexium] Reconnected to orchestrator!")
+                        print("[flexium] Reconnected to orchestrator!")
                         sys.stdout.flush()
                         reconnected = True
                         break
@@ -869,7 +869,7 @@ def _do_resume_from_checkpoint(
     source_idx = int(_extract_gpu_index(paused_device))
     target_idx = int(_extract_gpu_index(target_device))
 
-    print(f"[flexium] Restoring GPU state from checkpoint...")
+    print("[flexium] Restoring GPU state from checkpoint...")
     print(f"[flexium] Source device: {paused_device} (index {source_idx})")
     print(f"[flexium] Target device: {target_device} (index {target_idx})")
     print(f"[flexium] Current _current_device: {_current_device}")
@@ -885,7 +885,7 @@ def _do_resume_from_checkpoint(
         # especially after previous transparent migrations.
 
         if source_idx != target_idx:
-            print(f"[flexium] Resume to different device: will restore then migrate")
+            print("[flexium] Resume to different device: will restore then migrate")
             print(f"[flexium] Step 1: Restoring to original device (cuda:{source_idx})...")
             sys.stdout.flush()
 
@@ -924,7 +924,7 @@ def _do_resume_from_checkpoint(
 
         else:
             # Same device - just restore, no migration needed
-            print(f"[flexium] Restoring to same device (no migration needed)")
+            print("[flexium] Restoring to same device (no migration needed)")
             if not _driver_restore(pid):
                 logger.error("Restore failed")
                 print("[flexium] ERROR: Driver restore failed")
@@ -1116,18 +1116,18 @@ def _send_heartbeat() -> None:
 
             if cm.is_healthy:
                 # First failure - mark as reconnecting and try immediately
-                print(f"[flexium] Lost connection to orchestrator, attempting reconnect...")
+                print("[flexium] Lost connection to orchestrator, attempting reconnect...")
                 sys.stdout.flush()
                 cm.on_failure(e)
                 # Try reconnect immediately
                 if _attempt_reconnect():
-                    print(f"[flexium] Reconnected to orchestrator!")
+                    print("[flexium] Reconnected to orchestrator!")
                     sys.stdout.flush()
 
             elif cm.state == ConnectionState.RECONNECTING:
                 # Still in reconnecting phase - keep trying
                 if _attempt_reconnect():
-                    print(f"[flexium] Reconnected to orchestrator!")
+                    print("[flexium] Reconnected to orchestrator!")
                     sys.stdout.flush()
                 else:
                     # Count this as another failure
@@ -1136,11 +1136,11 @@ def _send_heartbeat() -> None:
             elif cm.state == ConnectionState.LOCAL_MODE:
                 # In local mode - check if time to reconnect
                 if cm.should_attempt_reconnect():
-                    print(f"[flexium] Attempting reconnection to orchestrator...")
+                    print("[flexium] Attempting reconnection to orchestrator...")
                     sys.stdout.flush()
                     cm.reset_for_reconnect()
                     if _attempt_reconnect():
-                        print(f"[flexium] Reconnected to orchestrator!")
+                        print("[flexium] Reconnected to orchestrator!")
                         sys.stdout.flush()
                     else:
                         cm.on_failure(e)
@@ -1281,7 +1281,7 @@ def _attempt_reconnect() -> bool:
             # Don't print here - callers will print their own success message
             return True
         else:
-            print(f"[flexium] Reconnection rejected by server")
+            print("[flexium] Reconnection rejected by server")
             sys.stdout.flush()
             return False
 
@@ -1357,10 +1357,10 @@ def _connect_orchestrator(config: FlexiumConfig) -> None:
         )
 
         if result:
-            print(f"[flexium] Registered with orchestrator")
+            print("[flexium] Registered with orchestrator")
         else:
             # Keep client alive for reconnection attempts
-            print(f"[flexium] WARNING: Registration failed, will retry periodically")
+            print("[flexium] WARNING: Registration failed, will retry periodically")
 
     except Exception as e:
         logger.error(f"Failed to connect to orchestrator: {e}")
@@ -1380,7 +1380,7 @@ def _disconnect_orchestrator() -> None:
     if _orchestrator_client:
         try:
             _orchestrator_client.unregister(_process_id)
-            print(f"[flexium] Unregistered from orchestrator")
+            print("[flexium] Unregistered from orchestrator")
         except Exception:
             pass
         _orchestrator_client = None
@@ -2006,19 +2006,19 @@ class recoverable:
         # Log the error
         logger.warning(f"GPU error detected: {error_type}")
         print(f"[flexium] GPU error: {error_type}")
-        print(f"[flexium] WARNING: The current operation is LOST. Migrating to new GPU...")
+        print("[flexium] WARNING: The current operation is LOST. Migrating to new GPU...")
         sys.stdout.flush()
 
         # Handle recovery (migrate to new GPU)
         try:
             self._handle_recovery_simple()
-            print(f"[flexium] Migration complete. Training continues (current batch was lost).")
+            print("[flexium] Migration complete. Training continues (current batch was lost).")
             sys.stdout.flush()
             return True  # Suppress exception, training continues
         except RuntimeError as e:
             # Migration failed - re-raise original error
             logger.error(f"Migration failed: {e}")
-            print(f"[flexium] ERROR: Migration failed. Original error will be raised.")
+            print("[flexium] ERROR: Migration failed. Original error will be raised.")
             sys.stdout.flush()
             return False
 
@@ -2115,7 +2115,7 @@ class recoverable:
         if target is None:
             if self._attempts >= self.max_retries:
                 logger.error(f"No recovery target available after {self._attempts} attempts")
-                print(f"[flexium] ERROR: No GPU available for recovery.")
+                print("[flexium] ERROR: No GPU available for recovery.")
                 sys.stdout.flush()
                 raise RuntimeError(
                     f"GPU error recovery failed after {self._attempts} retries: "

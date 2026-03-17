@@ -138,7 +138,7 @@ def main() -> None:
             num_workers=0,  # Use 0 for easier debugging
         )
 
-        print(f"\nDataLoader created:")
+        print("\nDataLoader created:")
         print(f"  Dataset size: {len(train_data)}")
         print(f"  Batch count: {len(train_loader)}")
         print()
