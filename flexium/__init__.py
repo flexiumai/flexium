@@ -34,6 +34,18 @@ __version__ = "0.2.0a1"
 # Import with: import flexium.auto
 # Usage: with flexium.auto.run(): ...
 
+# GPU layer for testing/mocking
+from flexium.gpu import GPUInterface, GPUInfo, DeviceReport, NvidiaGPU, MockGPU
+from flexium.utils.gpu_info import set_gpu_backend, get_gpu_backend
+
 __all__ = [
     "__version__",
+    # GPU layer
+    "GPUInterface",
+    "GPUInfo",
+    "DeviceReport",
+    "NvidiaGPU",
+    "MockGPU",
+    "set_gpu_backend",
+    "get_gpu_backend",
 ]

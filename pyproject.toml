@@ -30,8 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "grpcio>=1.50.0",
-    "protobuf>=4.0.0",
+    "python-socketio[client]>=5.0.0",
     "pynvml>=11.0.0",  # NVIDIA Management Library for GPU monitoring
     "flask>=2.0.0",    # Web dashboard
 ]
@@ -42,7 +41,6 @@ dev = [
     "pytest-cov>=4.0.0",
     "mypy>=1.0.0",
     "ruff>=0.1.0",
-    "grpcio-tools>=1.50.0",
 ]
 torch = [
     # Note: For CUDA support, install torch manually from PyTorch index:
@@ -96,8 +94,8 @@ show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = [
-    "grpc",
-    "grpc.*",
+    "socketio",
+    "socketio.*",
     "torch",
     "torch.*",
     "numpy",
@@ -139,8 +137,6 @@ addopts = "-v --tb=short"
 [tool.coverage.run]
 source = ["flexium"]
 omit = [
-    "flexium/proto/*_pb2.py",
-    "flexium/proto/*_pb2_grpc.py",
     "flexium/cli/*",
     "flexium/dashboard/*",
 ]

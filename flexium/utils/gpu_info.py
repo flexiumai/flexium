@@ -30,7 +30,40 @@ from typing import Any, Dict, List, Optional
 
 from flexium.utils.logging import get_logger
 
+# Import GPU layer types (avoid circular imports by importing at function level when needed)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from flexium.gpu.interface import GPUInterface
+
 logger = get_logger(__name__)
+
+# Global GPU backend - can be swapped for testing
+_gpu_backend: Optional["GPUInterface"] = None
+
+
+def set_gpu_backend(backend: Optional["GPUInterface"]) -> None:
+    """Set the GPU backend implementation.
+
+    This allows swapping the real GPU implementation for a mock during testing.
+
+    Parameters:
+        backend: GPUInterface implementation or None to use default pynvml.
+
+    Example:
+        from flexium.gpu import MockGPU
+        set_gpu_backend(MockGPU(num_devices=2))
+    """
+    global _gpu_backend
+    _gpu_backend = backend
+
+
+def get_gpu_backend() -> Optional["GPUInterface"]:
+    """Get the current GPU backend.
+
+    Returns:
+        The current GPUInterface implementation or None.
+    """
+    return _gpu_backend
 
 
 class GPUType(Enum):
@@ -770,29 +803,20 @@ def get_estimated_gpu_memory(device: str = "cuda:0") -> int:
     return 0
 
 
-def get_all_device_reports(hostname: str) -> List[Dict[str, Any]]:
-    """Get status of all devices (CPU + GPUs) on this host for reporting to orchestrator.
-
-    Collects detailed information about ALL devices on this host,
-    including memory usage, utilization, temperature, and power for GPUs.
-    This ignores CUDA_VISIBLE_DEVICES to report the full system state.
-
-    In mock GPU mode (FLEXIUM_MOCK_GPUS=N), returns mock GPU reports.
+def _get_cpu_report(hostname: str) -> Dict[str, Any]:
+    """Get CPU device report.
 
     Parameters:
-        hostname: Hostname to include in each report.
+        hostname: Hostname to include in report.
 
     Returns:
-        List of device reports with UUID, memory, utilization, etc.
+        Dictionary with CPU info.
     """
-    reports = []
-
-    # Always add CPU as a device
     try:
         import psutil
         mem = psutil.virtual_memory()
         cpu_percent = psutil.cpu_percent(interval=None)
-        reports.append({
+        return {
             "gpu_uuid": "CPU",
             "gpu_name": "CPU",
             "hostname": hostname,
@@ -800,39 +824,78 @@ def get_all_device_reports(hostname: str) -> List[Dict[str, Any]]:
             "memory_used": mem.used,
             "memory_free": mem.available,
             "gpu_utilization": int(cpu_percent),
-            "temperature": 0,  # Could use psutil.sensors_temperatures() if available
-            "power_usage": 0,
-            "process_count": 0,  # Not tracking CPU process count
-        })
-    except ImportError:
-        # psutil not available, add basic CPU entry
-        reports.append({
-            "gpu_uuid": "CPU",
-            "gpu_name": "CPU",
-            "hostname": hostname,
-            "memory_total": 0,
-            "memory_used": 0,
-            "memory_free": 0,
-            "gpu_utilization": 0,
             "temperature": 0,
             "power_usage": 0,
             "process_count": 0,
-        })
+        }
+    except ImportError:
+        pass
     except Exception as e:
         logger.debug(f"Failed to get CPU info: {e}")
-        # Still add a basic CPU entry
-        reports.append({
-            "gpu_uuid": "CPU",
-            "gpu_name": "CPU",
-            "hostname": hostname,
-            "memory_total": 0,
-            "memory_used": 0,
-            "memory_free": 0,
-            "gpu_utilization": 0,
-            "temperature": 0,
-            "power_usage": 0,
-            "process_count": 0,
-        })
+
+    # Fallback: basic CPU entry
+    return {
+        "gpu_uuid": "CPU",
+        "gpu_name": "CPU",
+        "hostname": hostname,
+        "memory_total": 0,
+        "memory_used": 0,
+        "memory_free": 0,
+        "gpu_utilization": 0,
+        "temperature": 0,
+        "power_usage": 0,
+        "process_count": 0,
+    }
+
+
+def get_all_device_reports(hostname: str) -> List[Dict[str, Any]]:
+    """Get status of all devices (CPU + GPUs) on this host for reporting to orchestrator.
+
+    Collects detailed information about ALL devices on this host,
+    including memory usage, utilization, temperature, and power for GPUs.
+    This ignores CUDA_VISIBLE_DEVICES to report the full system state.
+
+    If a GPU backend is set via set_gpu_backend(), uses that instead of pynvml.
+    This allows mocking GPUs for testing.
+
+    Parameters:
+        hostname: Hostname to include in each report.
+
+    Returns:
+        List of device reports with UUID, memory, utilization, etc.
+    """
+    # If a GPU backend is set, use it instead of direct pynvml calls
+    if _gpu_backend is not None:
+        reports = []
+        # Add CPU report
+        reports.append(_get_cpu_report(hostname))
+        # Add GPU reports from backend
+        gpu_reports = _gpu_backend.get_all_device_reports(hostname)
+        for report in gpu_reports:
+            if hasattr(report, 'to_dict'):
+                reports.append(report.to_dict())
+            elif isinstance(report, dict):
+                reports.append(report)
+            else:
+                # DeviceReport dataclass
+                reports.append({
+                    "gpu_uuid": report.gpu_uuid,
+                    "gpu_name": report.gpu_name,
+                    "hostname": report.hostname,
+                    "memory_total": report.memory_total,
+                    "memory_used": report.memory_used,
+                    "memory_free": report.memory_free,
+                    "gpu_utilization": report.gpu_utilization,
+                    "temperature": report.temperature,
+                    "power_usage": report.power_usage,
+                    "process_count": report.process_count,
+                })
+        return reports
+
+    reports = []
+
+    # Always add CPU as a device
+    reports.append(_get_cpu_report(hostname))
 
     # Add GPU devices
     try:

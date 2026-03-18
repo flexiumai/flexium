@@ -9,7 +9,6 @@ This guide will help you set up Flexium.AI and run your first migration-enabled 
 - NVIDIA GPU with CUDA support
 - **NVIDIA Driver 580+** (required for zero-residue migration)
 - Linux x86_64 (Windows/macOS not yet supported)
-- gRPC dependencies
 
 ## Installation
 
@@ -35,8 +34,7 @@ Flexium requires PyTorch with CUDA support. Install PyTorch following the [offic
 
 Core dependencies (installed automatically):
 
-- `grpcio>=1.50.0` - gRPC runtime
-- `protobuf>=4.0.0` - Protocol buffers
+- `python-socketio[client]>=5.0.0` - WebSocket communication
 - `pynvml>=11.0.0` - NVIDIA Management Library for GPU monitoring
 
 Development dependencies:

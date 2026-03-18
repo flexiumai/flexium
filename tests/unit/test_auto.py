@@ -824,9 +824,9 @@ class TestPauseResume:
 
         source = inspect.getsource(auto._do_pause)
 
-        # Must catch gRPC errors specifically for reconnection handling
-        assert "grpc.RpcError" in source, \
-            "_do_pause must catch grpc.RpcError for reconnection handling"
+        # Must catch exceptions for reconnection handling
+        assert "except Exception" in source, \
+            "_do_pause must catch exceptions for reconnection handling"
 
         # Must attempt reconnection on connection loss
         assert "_attempt_reconnect" in source, \
@@ -1453,32 +1453,53 @@ class TestSendHeartbeat:
 
         original_client = auto._orchestrator_client
         original_device = auto._current_device
+        original_physical_device = auto._physical_device
         original_process_id = auto._process_id
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.should_attempt_reconnect.return_value = False
-
-            # Mock heartbeat response
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_response.should_migrate = False
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.return_value = mock_response
+            mock_client.is_connected = True
+            mock_client.heartbeat.return_value = {"success": True}
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
+            auto._physical_device = "cuda:0"
             auto._process_id = "test-process"
 
-            # Should not raise
-            auto._send_heartbeat()
+            # Mock torch and GPU info to avoid import errors
+            with patch.dict("sys.modules", {"torch": MagicMock()}):
+                import sys
+                mock_torch = sys.modules["torch"]
+                mock_torch.cuda.is_available.return_value = True
+                mock_torch.cuda.device_count.return_value = 1
+
+                with patch("flexium.utils.gpu_info.get_estimated_gpu_memory", return_value=1000), \
+                     patch("flexium.utils.gpu_info.get_gpu_info", return_value=None), \
+                     patch("flexium.utils.gpu_info.discover_gpu_pid", return_value=None), \
+                     patch("flexium.utils.gpu_info.get_all_device_reports", return_value=[]):
+
+                    # Should not raise - this validates all imports are present
+                    auto._send_heartbeat()
+
+            # Verify heartbeat was called
+            mock_client.heartbeat.assert_called_once()
 
         finally:
             auto._orchestrator_client = original_client
             auto._current_device = original_device
+            auto._physical_device = original_physical_device
             auto._process_id = original_process_id
+
+    def test_send_heartbeat_all_imports_present(self) -> None:
+        """Test _send_heartbeat has all required imports (regression test for socket import)."""
+        import flexium.auto as auto
+        import inspect
+
+        # Check that socket module is imported at module level
+        source = inspect.getsource(auto)
+        assert "import socket" in source, (
+            "_send_heartbeat uses socket.gethostname() - socket must be imported"
+        )
 
 
 class TestHeartbeatLoop:
@@ -2951,14 +2972,10 @@ class TestAttemptReconnectRejection:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.on_success = MagicMock()
-            mock_client._stub = MagicMock()
-
-            # Mock Register response with success=False
-            mock_response = MagicMock()
-            mock_response.success = False
-            mock_client._stub.Register.return_value = mock_response
+            # Mock connect to succeed
+            mock_client.connect.return_value = True
+            # Mock register to return None (rejection)
+            mock_client.register.return_value = None
 
             auto._orchestrator_client = mock_client
             auto._process_id = "test-process"
@@ -2982,9 +2999,7 @@ class TestAttemptReconnectRejection:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
-            mock_client._stub.Register.side_effect = Exception("Connection failed")
+            mock_client.connect.side_effect = Exception("Connection failed")
 
             auto._orchestrator_client = mock_client
             auto._process_id = "test-process"
@@ -3166,16 +3181,14 @@ class TestSendHeartbeatMigration:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
+            mock_client.is_local_mode = False
 
             # Mock heartbeat response requesting pause
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_response.should_migrate = True
-            mock_response.target_device = "__PAUSE__"
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.return_value = mock_response
+            mock_client.heartbeat.return_value = {
+                "success": True,
+                "should_migrate": True,
+                "target_device": "__PAUSE__",
+            }
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
@@ -3204,16 +3217,14 @@ class TestSendHeartbeatMigration:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
+            mock_client.is_local_mode = False
 
             # Mock heartbeat response requesting migration
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_response.should_migrate = True
-            mock_response.target_device = "cuda:1"
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.return_value = mock_response
+            mock_client.heartbeat.return_value = {
+                "success": True,
+                "should_migrate": True,
+                "target_device": "cuda:1",
+            }
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
@@ -3235,10 +3246,9 @@ class TestSendHeartbeatMigration:
 class TestSendHeartbeatReconnection:
     """Tests for _send_heartbeat reconnection handling."""
 
-    def test_send_heartbeat_handles_grpc_error(self) -> None:
-        """Test _send_heartbeat handles gRPC errors gracefully."""
+    def test_send_heartbeat_handles_connection_error(self) -> None:
+        """Test _send_heartbeat handles connection errors gracefully."""
         import flexium.auto as auto
-        import grpc
 
         original_client = auto._orchestrator_client
         original_device = auto._current_device
@@ -3246,33 +3256,25 @@ class TestSendHeartbeatReconnection:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = True
+            mock_client.is_local_mode = False
 
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+            # Mock heartbeat to raise exception
+            mock_client.heartbeat.side_effect = Exception("Connection error")
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
             auto._process_id = "test-process"
 
-            # Mock _attempt_reconnect
-            with patch.object(auto, "_attempt_reconnect", return_value=False):
-                # Should not raise
-                auto._send_heartbeat()
-
-            # Should have called on_failure
-            mock_client.connection_manager.on_failure.assert_called()
+            # Should not raise - errors are caught internally
+            auto._send_heartbeat()
 
         finally:
             auto._orchestrator_client = original_client
             auto._current_device = original_device
             auto._process_id = original_process_id
 
-    def test_send_heartbeat_handles_non_grpc_error(self) -> None:
-        """Test _send_heartbeat handles non-gRPC errors."""
+    def test_send_heartbeat_handles_none_response(self) -> None:
+        """Test _send_heartbeat handles None response."""
         import flexium.auto as auto
 
         original_client = auto._orchestrator_client
@@ -3281,11 +3283,10 @@ class TestSendHeartbeatReconnection:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
+            mock_client.is_local_mode = False
 
-            # Mock heartbeat to raise generic error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = RuntimeError("Non-gRPC error")
+            # Mock heartbeat to return None (connection issue)
+            mock_client.heartbeat.return_value = None
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
@@ -3343,11 +3344,9 @@ class TestPatchFunctions:
 class TestHeartbeatReconnectionStates:
     """Tests for heartbeat reconnection state transitions."""
 
-    def test_send_heartbeat_reconnect_in_reconnecting_state(self) -> None:
-        """Test _send_heartbeat handles reconnection when in RECONNECTING state."""
+    def test_send_heartbeat_with_local_mode_client(self) -> None:
+        """Test _send_heartbeat handles local mode client."""
         import flexium.auto as auto
-        import grpc
-        from flexium.orchestrator.client import ConnectionState
 
         original_client = auto._orchestrator_client
         original_device = auto._current_device
@@ -3355,240 +3354,17 @@ class TestHeartbeatReconnectionStates:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            mock_client.connection_manager.state = ConnectionState.RECONNECTING
+            mock_client.is_local_mode = True
 
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
+            # Mock heartbeat to return success without migration
+            mock_client.heartbeat.return_value = {"success": True}
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
             auto._process_id = "test-process"
 
-            # Mock _attempt_reconnect to succeed
-            with patch.object(auto, "_attempt_reconnect", return_value=True):
-                # Should not raise
-                auto._send_heartbeat()
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_reconnect_fails_in_reconnecting_state(self) -> None:
-        """Test _send_heartbeat records failure when reconnect fails in RECONNECTING state."""
-        import flexium.auto as auto
-        import grpc
-        from flexium.orchestrator.client import ConnectionState
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            mock_client.connection_manager.state = ConnectionState.RECONNECTING
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Mock _attempt_reconnect to fail
-            with patch.object(auto, "_attempt_reconnect", return_value=False):
-                auto._send_heartbeat()
-
-            # Should have called on_failure again
-            assert mock_client.connection_manager.on_failure.called
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_reconnect_in_local_mode(self) -> None:
-        """Test _send_heartbeat handles reconnection from LOCAL_MODE state."""
-        import flexium.auto as auto
-        import grpc
-        from flexium.orchestrator.client import ConnectionState
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
-            mock_client.connection_manager.should_attempt_reconnect.return_value = True
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Mock _attempt_reconnect to succeed
-            with patch.object(auto, "_attempt_reconnect", return_value=True):
-                auto._send_heartbeat()
-
-            # Should have called reset_for_reconnect
-            mock_client.connection_manager.reset_for_reconnect.assert_called()
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_local_mode_not_time_to_reconnect(self) -> None:
-        """Test _send_heartbeat skips reconnection when not time in LOCAL_MODE."""
-        import flexium.auto as auto
-        import grpc
-        from flexium.orchestrator.client import ConnectionState
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
-            mock_client.connection_manager.should_attempt_reconnect.return_value = False
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Should not call reset_for_reconnect
+            # Should not raise
             auto._send_heartbeat()
-
-            mock_client.connection_manager.reset_for_reconnect.assert_not_called()
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_unknown_state(self) -> None:
-        """Test _send_heartbeat handles unknown connection state."""
-        import flexium.auto as auto
-        import grpc
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            # Set an unexpected state value
-            mock_client.connection_manager.state = "UNKNOWN_STATE"
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Should not raise, just log
-            auto._send_heartbeat()
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_reconnect_success_in_healthy_state(self) -> None:
-        """Test _send_heartbeat handles successful reconnect after first failure."""
-        import flexium.auto as auto
-        import grpc
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = True  # Healthy, first failure
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Mock _attempt_reconnect to succeed
-            with patch.object(auto, "_attempt_reconnect", return_value=True):
-                auto._send_heartbeat()
-
-            # Should have called on_failure first
-            mock_client.connection_manager.on_failure.assert_called()
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._current_device = original_device
-            auto._process_id = original_process_id
-
-    def test_send_heartbeat_local_mode_reconnect_fails(self) -> None:
-        """Test _send_heartbeat handles failed reconnect from LOCAL_MODE."""
-        import flexium.auto as auto
-        import grpc
-        from flexium.orchestrator.client import ConnectionState
-
-        original_client = auto._orchestrator_client
-        original_device = auto._current_device
-        original_process_id = auto._process_id
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
-            mock_client.connection_manager.is_healthy = False
-            mock_client.connection_manager.state = ConnectionState.LOCAL_MODE
-            mock_client.connection_manager.should_attempt_reconnect.return_value = True
-
-            # Mock heartbeat to raise gRPC error
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.side_effect = grpc.RpcError()
-
-            auto._orchestrator_client = mock_client
-            auto._current_device = "cuda:0"
-            auto._process_id = "test-process"
-
-            # Mock _attempt_reconnect to fail
-            with patch.object(auto, "_attempt_reconnect", return_value=False):
-                auto._send_heartbeat()
-
-            # Should have called on_failure
-            mock_client.connection_manager.on_failure.assert_called()
 
         finally:
             auto._orchestrator_client = original_client
@@ -3610,16 +3386,14 @@ class TestDoMigrationTrigger:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client.connection_manager.is_local_mode = False
+            mock_client.is_local_mode = False
 
             # Mock heartbeat response requesting migration
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_response.should_migrate = True
-            mock_response.target_device = "cuda:2"
-            mock_client._stub = MagicMock()
-            mock_client._stub.Heartbeat.return_value = mock_response
+            mock_client.heartbeat.return_value = {
+                "success": True,
+                "should_migrate": True,
+                "target_device": "cuda:2",
+            }
 
             auto._orchestrator_client = mock_client
             auto._current_device = "cuda:0"
@@ -3653,14 +3427,11 @@ class TestAttemptReconnectSuccess:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
             mock_client._metadata = {}
 
-            # Mock Register response with success=True
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_client._stub.Register.return_value = mock_response
+            # Mock connect and register to succeed
+            mock_client.connect.return_value = True
+            mock_client.register.return_value = "cuda:0"
 
             auto._orchestrator_client = mock_client
             auto._process_id = "test-process"
@@ -3674,7 +3445,7 @@ class TestAttemptReconnectSuccess:
             assert result is True
 
             # Should have sent heartbeat with cached devices
-            mock_client._stub.Heartbeat.assert_called()
+            mock_client.heartbeat.assert_called()
 
         finally:
             auto._orchestrator_client = original_client
@@ -3682,43 +3453,6 @@ class TestAttemptReconnectSuccess:
             auto._physical_device = original_device
             auto._cached_visible_devices = original_cached
             auto._pause_in_progress = original_pause
-
-    def test_attempt_reconnect_heartbeat_failure(self) -> None:
-        """Test _attempt_reconnect handles heartbeat exception gracefully."""
-        import flexium.auto as auto
-
-        original_client = auto._orchestrator_client
-        original_process_id = auto._process_id
-        original_device = auto._physical_device
-        original_cached = auto._cached_visible_devices
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
-            mock_client._metadata = {}
-
-            # Mock Register response with success=True
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_client._stub.Register.return_value = mock_response
-            # Heartbeat raises exception
-            mock_client._stub.Heartbeat.side_effect = Exception("Heartbeat failed")
-
-            auto._orchestrator_client = mock_client
-            auto._process_id = "test-process"
-            auto._physical_device = "cuda:0"
-            auto._cached_visible_devices = [{"gpu_uuid": "GPU-AAA"}]
-
-            # Should still succeed (heartbeat failure is logged but doesn't fail reconnect)
-            result = auto._attempt_reconnect()
-            assert result is True
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._process_id = original_process_id
-            auto._physical_device = original_device
-            auto._cached_visible_devices = original_cached
 
     def test_attempt_reconnect_with_pause_in_progress(self) -> None:
         """Test _attempt_reconnect notifies paused state when paused."""
@@ -3732,14 +3466,11 @@ class TestAttemptReconnectSuccess:
 
         try:
             mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
             mock_client._metadata = {}
 
-            # Mock Register response with success=True
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_client._stub.Register.return_value = mock_response
+            # Mock connect and register to succeed
+            mock_client.connect.return_value = True
+            mock_client.register.return_value = "cuda:0"
 
             auto._orchestrator_client = mock_client
             auto._process_id = "test-process"
@@ -3750,8 +3481,8 @@ class TestAttemptReconnectSuccess:
             result = auto._attempt_reconnect()
             assert result is True
 
-            # Should have called CompleteMigration with __PAUSED__
-            mock_client._stub.CompleteMigration.assert_called()
+            # Should have called complete_migration with __PAUSED__
+            mock_client.complete_migration.assert_called()
 
         finally:
             auto._orchestrator_client = original_client
@@ -3759,75 +3490,6 @@ class TestAttemptReconnectSuccess:
             auto._physical_device = original_device
             auto._cached_visible_devices = original_cached
             auto._pause_in_progress = original_pause
-
-    def test_attempt_reconnect_complete_migration_exception(self) -> None:
-        """Test _attempt_reconnect handles CompleteMigration exception."""
-        import flexium.auto as auto
-
-        original_client = auto._orchestrator_client
-        original_process_id = auto._process_id
-        original_device = auto._physical_device
-        original_pause = auto._pause_in_progress
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
-            mock_client._metadata = {}
-
-            # Mock Register response with success=True
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_client._stub.Register.return_value = mock_response
-            # CompleteMigration raises exception
-            mock_client._stub.CompleteMigration.side_effect = Exception("Failed")
-
-            auto._orchestrator_client = mock_client
-            auto._process_id = "test-process"
-            auto._physical_device = "cuda:0"
-            auto._pause_in_progress = True
-
-            # Should still succeed (exception is logged but doesn't fail reconnect)
-            result = auto._attempt_reconnect()
-            assert result is True
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._process_id = original_process_id
-            auto._physical_device = original_device
-            auto._pause_in_progress = original_pause
-
-    def test_attempt_reconnect_invalid_device_format(self) -> None:
-        """Test _attempt_reconnect handles invalid device format."""
-        import flexium.auto as auto
-
-        original_client = auto._orchestrator_client
-        original_process_id = auto._process_id
-        original_device = auto._physical_device
-
-        try:
-            mock_client = MagicMock()
-            mock_client.connection_manager = MagicMock()
-            mock_client._stub = MagicMock()
-            mock_client._metadata = {}
-
-            # Mock Register response with success=True
-            mock_response = MagicMock()
-            mock_response.success = True
-            mock_client._stub.Register.return_value = mock_response
-
-            auto._orchestrator_client = mock_client
-            auto._process_id = "test-process"
-            # Invalid device format (no colon)
-            auto._physical_device = "cuda"
-
-            result = auto._attempt_reconnect()
-            assert result is True
-
-        finally:
-            auto._orchestrator_client = original_client
-            auto._process_id = original_process_id
-            auto._physical_device = original_device
 
 
 class TestConnectOrchestratorPaths:

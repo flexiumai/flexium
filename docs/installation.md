@@ -110,8 +110,7 @@ CUDA version: 12.4
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `grpcio` | >=1.50.0 | gRPC communication |
-| `protobuf` | >=4.0.0 | Protocol buffers |
+| `python-socketio[client]` | >=5.0.0 | WebSocket communication |
 | `pynvml` | >=11.0.0 | GPU monitoring |
 | `flask` | >=2.0.0 | Web dashboard |
 
@@ -300,7 +299,7 @@ pip show flexium
 pip install --force-reinstall flexium
 ```
 
-### "grpcio installation fails"
+### "python-socketio installation fails"
 
 ```bash
 # Install build dependencies
