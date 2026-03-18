@@ -6,6 +6,23 @@
 
 **Flexible Resource Allocation** - Dynamic GPU orchestration for PyTorch training with zero VRAM residue migration.
 
+---
+
+## :material-handshake: Become a Design Partner
+
+We're looking for **design partners** to explore advanced capabilities:
+
+- Automatic migration based on resource optimization
+- Distributed training support (DDP/FSDP)
+- Integration with job schedulers (Slurm/Kubernetes)
+- Multi-node GPU orchestration
+
+If you're managing multi-GPU servers and want to shape the future of GPU orchestration, we'd love to hear from you!
+
+**[:material-email: Contact us](mailto:flexium.ai@gmail.com?subject=Design%20Partner%20Inquiry){ .md-button .md-button--primary }**
+
+---
+
 <div class="grid cards" markdown>
 
 -   :material-clock-fast:{ .lg .middle } __Quick Start__
