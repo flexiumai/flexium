@@ -49,10 +49,10 @@ Flexium is a cloud-hosted service. Set the `FLEXIUM_SERVER` environment variable
 
 ```bash
 # Format: host:port/workspace
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 ```
 
-Sign up for free at [flexium.ai](https://flexium.ai) to create your workspace.
+Sign up for free at [app.flexium.ai](https://app.flexium.ai) to create your workspace.
 
 ### Step 2: Add flexium to Your Training Script
 
@@ -96,7 +96,7 @@ That's it! Your training is now migration-enabled.
 
 ```bash
 # Set server address with workspace
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # Run your script normally
 python train.py
@@ -104,7 +104,7 @@ python train.py
 
 ### Step 4: Monitor and Migrate
 
-Open your workspace dashboard at [flexium.ai](https://flexium.ai) to:
+Open your workspace dashboard at [app.flexium.ai](https://app.flexium.ai) to:
 
 - See all running training jobs
 - Monitor GPU utilization
@@ -117,7 +117,7 @@ Open your workspace dashboard at [flexium.ai](https://flexium.ai) to:
 
 ```bash
 # Server with workspace (required)
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # Optional: default device
 export GPU_DEVICE=cuda:0
@@ -128,14 +128,14 @@ export GPU_DEVICE=cuda:0
 Create `~/.flexiumrc`:
 
 ```yaml
-server: flexium.ai:80/myworkspace
+server: app.flexium.ai/myworkspace
 device: cuda:0
 ```
 
 ### Inline Parameters
 
 ```python
-with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace", device="cuda:0"):
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace", device="cuda:0"):
     ...
 ```
 
@@ -158,7 +158,7 @@ python -c "import flexium; print('OK')"
 
 1. Set your server connection:
    ```bash
-   export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+   export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
    ```
 
 2. Run example:

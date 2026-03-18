@@ -27,23 +27,23 @@ Common issues and their solutions when using flexium.
 1. **Check FLEXIUM_SERVER is set correctly:**
    ```bash
    echo $FLEXIUM_SERVER
-   # Should show: flexium.ai:80/yourworkspace
+   # Should show: app.flexium.ai/yourworkspace
    ```
 
 2. **Check network connectivity:**
    ```bash
    # Test connection to Flexium cloud
-   nc -zv flexium.ai 80
+   nc -zv app.flexium.ai 443
    ```
 
 3. **Check firewall allows outbound connections:**
    ```bash
-   # Ensure outbound port 80 is allowed
-   curl -v https://flexium.ai
+   # Ensure outbound HTTPS is allowed
+   curl -v https://app.flexium.ai/health
    ```
 
 4. **Verify workspace exists:**
-   Log in to [flexium.ai](https://flexium.ai) and confirm your workspace name is correct.
+   Log in to [app.flexium.ai](https://app.flexium.ai) and confirm your workspace name is correct.
 
 ### Training process issues
 
@@ -70,7 +70,7 @@ Common issues and their solutions when using flexium.
 
 1. **Check FLEXIUM_SERVER is set:**
    ```bash
-   export FLEXIUM_SERVER="flexium.ai:80/yourworkspace"
+   export FLEXIUM_SERVER="app.flexium.ai/yourworkspace"
    ```
 
 2. **The training will still work:**
@@ -228,7 +228,7 @@ If you attach a debugger (PyCharm, VS Code, pdb), flexium automatically switches
 
 ### Check Process Status
 
-View all your processes in the dashboard at [flexium.ai](https://flexium.ai). Click on any process to see detailed status including device, memory usage, and runtime.
+View all your processes in the dashboard at [app.flexium.ai](https://app.flexium.ai). Click on any process to see detailed status including device, memory usage, and runtime.
 
 ---
 
@@ -294,9 +294,9 @@ PRODUCTION=1 python train.py  # Bypasses flexium
 
 ### Q: Where does the Flexium server run?
 
-A: Flexium is a cloud-hosted service at flexium.ai. You don't need to run any servers - just set your workspace:
+A: Flexium is a cloud-hosted service at app.flexium.ai. You don't need to run any servers - just set your workspace:
 ```bash
-export FLEXIUM_SERVER="flexium.ai:80/yourworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/yourworkspace"
 ```
 
 ---

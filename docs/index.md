@@ -168,15 +168,15 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 
 ## How It Works
 
-1. **Sign Up**: Create a free account at [flexium.ai](https://flexium.ai) and create a workspace
+1. **Sign Up**: Create a free account at [app.flexium.ai](https://app.flexium.ai) and create a workspace
 
 2. **Connect Your Training**: Set your workspace and run
    ```bash
-   export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+   export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
    python train.py
    ```
 
-3. **Monitor & Migrate**: Via web dashboard at [flexium.ai](https://flexium.ai)
+3. **Monitor & Migrate**: Via web dashboard at [app.flexium.ai](https://app.flexium.ai)
    - See all running training jobs
    - One-click migration between GPUs
    - Pause and resume training
@@ -217,7 +217,7 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 
 Move training jobs between GPUs based on demand via the dashboard:
 
-1. Open your workspace at [flexium.ai](https://flexium.ai)
+1. Open your workspace at [app.flexium.ai](https://app.flexium.ai)
 2. Find the job you want to move
 3. Click "Migrate" and select the target GPU
 
@@ -238,7 +238,7 @@ If a GPU has issues, migrate affected jobs via dashboard - select each job and m
 Test on GPU 0, then move to production GPU:
 
 1. Start training: `python train.py` (runs on cuda:0)
-2. Open dashboard at [flexium.ai](https://flexium.ai)
+2. Open dashboard at [app.flexium.ai](https://app.flexium.ai)
 3. Click "Migrate" to move to production GPU without stopping
 
 ---

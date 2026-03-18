@@ -102,20 +102,20 @@ Your training code never knows it moved.
 ### Environment Variable (Recommended)
 
 ```bash
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 ```
 
 ### Inline Parameter
 
 ```python
-with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
     ...
 ```
 
 ### Config File (`~/.flexiumrc`)
 
 ```yaml
-server: flexium.ai:80/myworkspace
+server: app.flexium.ai/myworkspace
 device: cuda:0
 ```
 

@@ -83,7 +83,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
     **When colleague needs the GPU:**
 
-    1. Open dashboard at [flexium.ai](https://flexium.ai)
+    1. Open dashboard at [app.flexium.ai](https://app.flexium.ai)
     2. Click "Migrate" on your process
     3. Select cuda:1 as target
 
@@ -219,7 +219,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
     ```bash
     # Set workspace (once per terminal)
-    $ export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+    $ export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
     # Alice starts training
     $ python alice_train.py  # Auto-registers with Flexium
@@ -227,7 +227,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     # Bob starts training
     $ python bob_train.py  # Also registers
 
-    # Charlie has urgent deadline - opens dashboard at flexium.ai
+    # Charlie has urgent deadline - opens dashboard at app.flexium.ai
     # Sees:
     #   alice-abc123    cuda:0    running
     #   bob-def456      cuda:1    running
@@ -239,7 +239,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
     # No Slack messages needed!
     ```
 
-    **Dashboard view (flexium.ai):**
+    **Dashboard view (app.flexium.ai):**
     ```
     ┌─────────────────────────────────────────────────────────────┐
     │  Flexium.AI Dashboard                                    │
@@ -291,7 +291,7 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 === "✅ With flexium"
 
     ```
-    # Open dashboard at flexium.ai - see all jobs:
+    # Open dashboard at app.flexium.ai - see all jobs:
     #
     # PROCESS           DEVICE    STATUS    VRAM
     # alice-research    cuda:0    running   28.5 GB
@@ -589,7 +589,7 @@ from flexium.lightning import FlexiumCallback
 
 # Just add the callback - that's it!
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
+    callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -687,7 +687,7 @@ trainer.fit(model, dataloader)
 
         # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
         flexium_callback = FlexiumCallback(
-            orchestrator="flexium.ai:80/myworkspace",  # Or use FLEXIUM_SERVER env var
+            orchestrator="app.flexium.ai/myworkspace",  # Or use FLEXIUM_SERVER env var
         )
 
         # Create trainer with Flexium callback
@@ -710,7 +710,7 @@ trainer.fit(model, dataloader)
 
 ```bash
 # Set workspace
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # Run Lightning example
 python examples/lightning/mnist_lightning.py
@@ -729,7 +729,7 @@ python examples/lightning/mnist_lightning.py --disabled
     ```python
     import flexium.auto
 
-    with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+    with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
         model = Net().cuda()
         optimizer = torch.optim.Adam(model.parameters())
 
@@ -745,7 +745,7 @@ python examples/lightning/mnist_lightning.py --disabled
     from flexium.lightning import FlexiumCallback
 
     trainer = Trainer(
-        callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
+        callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
         max_epochs=10,
         accelerator="gpu",
         devices=1,
@@ -867,7 +867,7 @@ Run multiple training jobs and migrate between them:
 # job1.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
     # Training job 1
     model1 = Model1().cuda()
     train(model1)
@@ -875,13 +875,13 @@ with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
 # job2.py
 import flexium.auto
 
-with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
     # Training job 2
     model2 = Model2().cuda()
     train(model2)
 ```
 
-Then use the dashboard at [flexium.ai](https://flexium.ai) to manage:
+Then use the dashboard at [app.flexium.ai](https://app.flexium.ai) to manage:
 
 - See both jobs and their GPU assignments
 - Click "Migrate" to move jobs between GPUs as needed
@@ -904,7 +904,7 @@ Then use the dashboard at [flexium.ai](https://flexium.ai) to manage:
 
 
     def train():
-        with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+        with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
             model = MyModel().cuda()
             optimizer = torch.optim.Adam(model.parameters())
 
@@ -1862,7 +1862,7 @@ Training a Vision Transformer for image classification:
 
 ```bash
 # Set workspace
-export FLEXIUM_SERVER="flexium.ai:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # Run MNIST example
 python examples/simple/mnist_train_auto.py

@@ -84,7 +84,7 @@ with flexium.auto.run():
 
 **With Flexium server:**
 ```python
-with flexium.auto.run(orchestrator="flexium.ai:80/myworkspace"):
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
     model = Net().cuda()
 ```
 
@@ -103,7 +103,7 @@ with flexium.auto.run(disabled=True):
 
 **Environment variables:**
 ```bash
-export FLEXIUM_SERVER=flexium.ai:80/myworkspace
+export FLEXIUM_SERVER=app.flexium.ai/myworkspace
 export GPU_DEVICE=cuda:1
 python train.py
 ```
@@ -129,7 +129,7 @@ If no server is configured:
 [flexium] Running in local mode (no migration support)
 [flexium]
 [flexium] To enable Flexium, set FLEXIUM_SERVER:
-[flexium]   export FLEXIUM_SERVER=flexium.ai:80/myworkspace
+[flexium]   export FLEXIUM_SERVER=app.flexium.ai/myworkspace
 ============================================================
 ```
 
@@ -360,7 +360,7 @@ class MyModel(LightningModule):
     ...
 
 trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="flexium.ai:80/myworkspace")],
+    callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
     max_epochs=100,
     accelerator="gpu",
     devices=1,
@@ -378,7 +378,7 @@ For more details, see [Lightning Integration](features/lightning-integration.md)
 
 ```yaml
 # ~/.flexiumrc or ./.flexiumrc
-server: flexium.ai:80/myworkspace
+server: app.flexium.ai/myworkspace
 device: cuda:0
 ```
 
@@ -386,7 +386,7 @@ device: cuda:0
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `FLEXIUM_SERVER` | Flexium server address | `flexium.ai:80/workspace` |
+| `FLEXIUM_SERVER` | Flexium server address | `app.flexium.ai/workspace` |
 | `GPU_DEVICE` | Initial device | `cuda:0` |
 | `FLEXIUM_LOG_LEVEL` | Logging level | `DEBUG` |
 
@@ -399,10 +399,10 @@ from flexium.config import load_config
 config = load_config()
 
 # Override specific values
-config = load_config(orchestrator="flexium.ai:80/myworkspace", device="cuda:2")
+config = load_config(orchestrator="app.flexium.ai/myworkspace", device="cuda:2")
 
 # Access values
-print(config.orchestrator)  # "flexium.ai:80/myworkspace"
+print(config.orchestrator)  # "app.flexium.ai/myworkspace"
 print(config.device)        # "cuda:2"
 ```
 
@@ -410,7 +410,7 @@ print(config.device)        # "cuda:2"
 
 ## Dashboard Controls
 
-All process management is done through the web dashboard at [flexium.ai](https://flexium.ai).
+All process management is done through the web dashboard at [app.flexium.ai](https://app.flexium.ai).
 
 ### Process Management
 
