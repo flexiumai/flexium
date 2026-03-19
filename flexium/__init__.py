@@ -28,7 +28,7 @@ same loop iteration, just on a different GPU.
 
 from __future__ import annotations
 
-__version__ = "0.2.0a2"
+__version__ = "0.2.0a3"
 
 # The main API is flexium.auto.run()
 # Import with: import flexium.auto
