@@ -6,8 +6,6 @@
 
 **Flexible Resource Allocation** - Seamlessly migrate PyTorch training between GPUs with zero interruption. Your model continues from the exact batch where it left off, and the source GPU is completely freed with zero VRAM residue.
 
-**[:material-gauge-full: Open Dashboard](https://app.flexium.ai){ .md-button target="_blank" }** · **[:material-github: GitHub](https://github.com/flexiumai/flexium){ .md-button .md-button--primary target="_blank" }**
-
 ---
 
 ## :material-handshake: Become a Design Partner
@@ -58,6 +56,14 @@ If you're managing multi-GPU servers and want to shape the future of GPU orchest
     Working examples from simple to production-ready.
 
     [:octicons-arrow-right-24: Examples](examples.md)
+
+-   :material-gauge-full:{ .lg .middle } __Dashboard__
+
+    ---
+
+    Monitor jobs and migrate GPUs with one click.
+
+    [:octicons-arrow-right-24: Open Dashboard](https://app.flexium.ai){ target="_blank" }
 
 </div>
 
