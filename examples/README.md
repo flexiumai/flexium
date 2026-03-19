@@ -6,7 +6,7 @@ Example scripts demonstrating flexium's transparent GPU migration capabilities.
 
 ```bash
 # 1. Set your server and workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # 2. Run an example
 python examples/simple/mnist_train_auto.py
@@ -49,7 +49,7 @@ Most examples require:
 
 ```bash
 # Required: Server address with workspace
-export FLEXIUM_SERVER="localhost:80/myworkspace"
+export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 
 # Optional: Default device
 export GPU_DEVICE=cuda:0

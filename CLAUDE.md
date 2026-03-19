@@ -31,14 +31,14 @@ pip install git+https://github.com/flexiumai/flexium.git
 ### Environment Variables
 | Variable | Description |
 |----------|-------------|
-| `FLEXIUM_SERVER` | Server URL: `host:port/workspace` |
+| `FLEXIUM_SERVER` | Server URL: `app.flexium.ai/workspace` |
 | `GPU_DEVICE` | Initial GPU device (default: `cuda:0`) |
 | `FLEXIUM_DEBUG` | Enable debug logging |
 
 ### Connection Example
 ```python
 import os
-os.environ["FLEXIUM_SERVER"] = "flexium.ai:80/myworkspace"
+os.environ["FLEXIUM_SERVER"] = "app.flexium.ai/myworkspace"
 
 import flexium.auto
 with flexium.auto.run():
