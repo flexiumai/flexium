@@ -67,8 +67,8 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 
 ### Key Features
 
-- **Zero VRAM Residue**: When a process migrates, the source GPU has **0 MB** used
 - **Seamless Migration**: Training continues from the exact batch where it stopped
+- **Zero VRAM Residue**: When a process migrates, the source GPU has **0 MB** used
 - **Minimal Code Changes**: As few as 2 lines to integrate
 - **Remote Orchestration**: Manage GPUs across your cluster
 - **Web Dashboard**: Real-time monitoring and one-click migration
