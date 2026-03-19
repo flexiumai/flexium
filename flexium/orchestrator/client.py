@@ -47,7 +47,7 @@ class OrchestratorClient:
     implementing the Transport interface (WebSocket, gRPC, Mock, etc.).
 
     Example with address string (creates WebSocket transport):
-        client = OrchestratorClient(address="flexium.ai:80/workspace")
+        client = OrchestratorClient(address="app.flexium.ai/workspace")
 
     Example with explicit transport (for testing):
         transport = MockTransport(my_handler)

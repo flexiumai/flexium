@@ -32,7 +32,7 @@ class WebSocketTransport(Transport):
         """Initialize WebSocket transport.
 
         Parameters:
-            server_url: The WebSocket server URL (e.g., "http://flexium.ai:80").
+            server_url: The WebSocket server URL (e.g., "https://app.flexium.ai").
             workspace: The workspace name for authentication.
         """
         self._server_url = server_url
