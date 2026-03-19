@@ -1,10 +1,10 @@
-# Graceful Degradation
+# Works Offline
 
-Flexium supports graceful degradation - your training continues even if connection to Flexium is lost.
+Your training keeps running even if the connection to Flexium is lost.
 
 ## Overview
 
-Flexium is not a single point of failure. If the connection to Flexium cloud is lost, your training continues normally in "local mode". When connection is restored, Flexium automatically reconnects.
+If the connection to Flexium is lost (network issues, server maintenance, etc.), your training continues normally. When connection is restored, Flexium automatically reconnects - no action needed from you.
 
 ## How It Works
 

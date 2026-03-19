@@ -72,7 +72,7 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 - **Minimal Code Changes**: As few as 2 lines to integrate
 - **Remote Orchestration**: Manage GPUs across your cluster
 - **Web Dashboard**: Real-time monitoring and one-click migration
-- **Graceful Degradation**: Works standalone without orchestrator (no single point of failure)
+- **Works Offline**: Training continues even if server connection is lost
 - **GPU UUID Support**: Target specific physical GPUs for reproducibility
 
 ### The Problem
@@ -276,11 +276,11 @@ Test on GPU 0, then move to production GPU:
 
     GPU errors (OOM, device assert, ECC) can be recovered automatically. Use `recoverable()` to enable auto-migration and retry on errors.
 
--   :material-shield-check:{ .lg .middle } __No Single Point of Failure__
+-   :material-shield-check:{ .lg .middle } __Works Offline__
 
     ---
 
-    Works standalone without orchestrator. If connection is lost, training continues normally. Reconnects automatically when available.
+    If connection to Flexium is lost, your training keeps running. It reconnects automatically when the server is back.
 
 -   :material-chart-line:{ .lg .middle } __Real-Time Dashboard__
 
@@ -322,7 +322,7 @@ Test on GPU 0, then move to production GPU:
 | [Zero-Residue Migration](features/zero-residue-migration.md) | Driver-level migration with zero VRAM residue |
 | [GPU Error Recovery](features/gpu-error-recovery.md) | Automatic recovery from OOM, ECC, and other GPU errors |
 | [Pause/Resume](features/pause-resume.md) | Pause training to free GPU, resume later |
-| [Graceful Degradation](features/graceful-degradation.md) | Standalone mode without orchestrator |
+| [Works Offline](features/graceful-degradation.md) | Training continues even if server connection is lost |
 | [Lightning Integration](features/lightning-integration.md) | PyTorch Lightning support with FlexiumCallback |
 
 ---
