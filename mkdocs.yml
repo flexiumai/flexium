@@ -116,6 +116,9 @@ markdown_extensions:
 
 extra:
   social:
+    - icon: fontawesome/solid/house
+      link: https://flexium.ai
+      name: Home
     - icon: fontawesome/solid/gauge-high
       link: https://app.flexium.ai
       name: Dashboard
