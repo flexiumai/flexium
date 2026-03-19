@@ -4,7 +4,7 @@
   <img src="assets/logo_with_text.png" alt="Flexium.AI Logo" width="350">
 </p>
 
-**Flexible Resource Allocation** - Seamlessly migrate PyTorch training between GPUs with zero interruption. Your model continues from the exact batch where it left off, and the source GPU is completely freed with zero VRAM residue.
+**Flexible Resource Allocation** - Seamlessly migrate PyTorch training between GPUs with zero interruption. Your model continues from exactly where it left off, and the source GPU is completely freed with zero VRAM residue.
 
 ---
 
