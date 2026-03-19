@@ -735,6 +735,7 @@ def _do_pause() -> None:
                     memory_allocated=0,
                     memory_reserved=0,
                     device="__PAUSED__",
+                    visible_devices=_cached_visible_devices,
                 )
 
                 if response and response.get("should_migrate") and response.get("target_device"):
