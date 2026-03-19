@@ -149,3 +149,36 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
 ]
+
+[tool.tbump]
+# tbump configuration for version bumping
+# Usage: tbump 0.2.0a3
+
+[tool.tbump.version]
+current = "0.2.0a2"
+
+# Version regex pattern - supports:
+# - release: 0.2.0
+# - alpha: 0.2.0a3
+# - beta: 0.2.0b1
+# - rc: 0.2.0rc1
+regex = '''
+  (?P<major>\d+)
+  \.
+  (?P<minor>\d+)
+  \.
+  (?P<patch>\d+)
+  ((?P<pre>[abc]|rc)(?P<prenum>\d+))?
+'''
+
+[tool.tbump.git]
+message_template = "Bump version to {new_version}"
+tag_template = "v{new_version}"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+search = 'version = "{current_version}"'
+
+[[tool.tbump.file]]
+src = "flexium/__init__.py"
+search = '__version__ = "{current_version}"'
