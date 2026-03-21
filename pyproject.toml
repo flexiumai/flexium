@@ -67,6 +67,7 @@ all = [
 
 [project.scripts]
 flexium-ctl = "flexium.cli.flexium_ctl:main"
+flexium-setup = "flexium.cli.flexium_setup:main"
 
 [project.urls]
 Homepage = "https://github.com/flexiumai/flexium"
@@ -78,7 +79,7 @@ where = ["."]
 include = ["flexium*"]
 
 [tool.setuptools.package-data]
-flexium = ["proto/*.proto", "dashboard/templates/*.html", "dashboard/static/*.png"]
+flexium = ["proto/*.proto", "dashboard/templates/*.html", "dashboard/static/*.png", "bin/*"]
 
 [tool.mypy]
 python_version = "3.8"
