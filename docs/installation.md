@@ -18,21 +18,22 @@ This guide covers all installation methods and requirements for Flexium.AI.
 |-------------|---------|-------|
 | Operating System | Linux x86_64 | Ubuntu 20.04+, RHEL 8+, Debian 10+ |
 | Python | 3.8 - 3.12 | 3.10+ recommended |
-| NVIDIA Driver | **580+** | **Required** for zero-residue migration |
-| CUDA | 12.4+ | Required for driver 580+ |
+| NVIDIA Driver | **550+** / **580+** | 550+ for pause/resume, 580+ for GPU migration |
+| CUDA | 12.4+ | Required for driver 550+ |
 | PyTorch | 2.0+ | With CUDA support |
 
-!!! warning "Driver 580+ Required"
-    Zero-residue migration requires NVIDIA driver version 580 or higher. Earlier drivers do not support the necessary migration features.
+!!! info "Driver Requirements"
+    - **Driver 550+**: Pause/resume training on the same GPU
+    - **Driver 580+**: Migrate training to a different GPU with zero VRAM residue
 
 ### Verify Driver Version
 
 ```bash
 nvidia-smi --query-gpu=driver_version --format=csv,noheader
-# Expected output: 580.xx or higher
+# 550+ for pause/resume, 580+ for GPU migration
 ```
 
-If your driver is older than 580, you'll need to update:
+If your driver is older than 550, you'll need to update:
 
 ```bash
 # Ubuntu/Debian
@@ -286,7 +287,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 **Solutions:**
-1. Install NVIDIA driver: `sudo apt install nvidia-driver-580`
+1. Install NVIDIA driver: `sudo apt install nvidia-driver-550` (or `nvidia-driver-580` for GPU migration)
 2. Reinstall PyTorch with CUDA 12.4: `pip install torch --index-url https://download.pytorch.org/whl/cu124`
 
 ### "Module 'flexium' not found"

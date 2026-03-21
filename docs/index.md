@@ -78,10 +78,10 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 - **Seamless Migration**: Training continues from the exact batch where it stopped
 - **Zero VRAM Residue**: When a process migrates, the source GPU has **0 MB** used
 - **Minimal Code Changes**: As few as 2 lines to integrate
-- **Remote Orchestration**: Manage GPUs across your cluster
 - **Web Dashboard**: Real-time monitoring and one-click migration
 - **Works Offline**: Training continues even if server connection is lost
-- **GPU UUID Support**: Target specific physical GPUs for reproducibility
+- **No Server Installation**: Just `pip install flexium` - no agents or daemons needed
+- **GPU Error Recovery**: Auto-recover from OOM and GPU errors by migrating to healthy GPU
 
 ### The Problem
 
@@ -95,7 +95,7 @@ torch.cuda.empty_cache()     # Doesn't guarantee cleanup
 
 ### The Solution
 
-Flexium uses **driver-level migration** (requires driver 580+) that guarantees complete memory release:
+Flexium uses **driver-level migration** that guarantees complete memory release:
 
 ```
 ┌───────────────────────────────────────┐
@@ -184,8 +184,10 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 
 - Python 3.8+
 - PyTorch 2.0+ with CUDA support
-- **NVIDIA Driver 580+** (required for zero-residue migration)
 - Linux x86_64
+- NVIDIA Driver:
+    - **550+** for pause/resume (same GPU)
+    - **580+** for GPU migration (different GPU)
 
 **Note:** Flexium requires PyTorch with CUDA support. Install PyTorch following the [official instructions](https://pytorch.org/get-started/locally/) for your system.
 
@@ -302,11 +304,11 @@ Test on GPU 0, then move to production GPU:
 
     Just 2 lines of code to enable. No changes to your training logic, model, or dataloader.
 
--   :material-target:{ .lg .middle } __GPU UUID Targeting__
+-   :material-wrench:{ .lg .middle } __GPU Error Recovery__
 
     ---
 
-    Target specific physical GPUs by UUID for reproducibility and hardware-specific debugging.
+    OOM, ECC errors, device asserts — automatically recover by migrating to a healthy GPU and retrying.
 
 </div>
 

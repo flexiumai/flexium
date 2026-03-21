@@ -2,9 +2,11 @@
 
 Flexium's zero-residue migration ensures that when a training job migrates from one GPU to another, **no memory is left behind** on the source GPU.
 
+**Driver Requirement:** NVIDIA 580+ for GPU migration
+
 ## How It Works
 
-Traditional approaches (like `model.to(device)`) leave memory fragments due to PyTorch's caching allocator. Flexium uses driver-level migration (requires driver 580+):
+Traditional approaches (like `model.to(device)`) leave memory fragments due to PyTorch's caching allocator. Flexium uses driver-level migration:
 
 1. **Capture** - Complete GPU state is captured at driver level
 2. **Release** - Source GPU is completely freed (0 MB)

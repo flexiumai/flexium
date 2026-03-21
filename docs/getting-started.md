@@ -7,7 +7,9 @@ This guide will help you set up Flexium.AI and run your first migration-enabled 
 - Python 3.8+
 - PyTorch 2.0+ with CUDA support
 - NVIDIA GPU with CUDA support
-- **NVIDIA Driver 580+** (required for zero-residue migration)
+- NVIDIA Driver:
+    - **550+** for pause/resume (same GPU)
+    - **580+** for GPU migration (different GPU)
 - Linux x86_64 (Windows/macOS not yet supported)
 
 ## Installation
@@ -145,7 +147,7 @@ with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace", device="cuda:0"
 
 ```bash
 nvidia-smi --query-gpu=driver_version --format=csv,noheader
-# Should show 580.xx or higher
+# 550+ for pause/resume, 580+ for GPU migration
 ```
 
 ### Check Installation

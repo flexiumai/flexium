@@ -2,7 +2,7 @@
 
 Complete API documentation for flexium.
 
-**Requirements:** NVIDIA Driver 580+, PyTorch 2.0+, Linux x86_64
+**Requirements:** NVIDIA Driver 550+ (pause/resume) or 580+ (migration), PyTorch 2.0+, Linux x86_64
 
 ## Table of Contents
 
@@ -196,7 +196,7 @@ for attempt in flexium.auto.recoverable(retries=3):
 
 - **Simple context manager**: Operation is lost, training continues
 - **Decorator/Iterator**: Operation is retried on new GPU
-- Requires migration (driver 580+) and orchestrator connection
+- Requires migration (driver 580+) and server connection
 - Non-CUDA errors are always re-raised immediately
 
 For more details, see [GPU Error Recovery](features/gpu-error-recovery.md).
@@ -263,7 +263,7 @@ with flexium.auto.run():
 
 At startup, Flexium verifies:
 - CUDA is available via PyTorch
-- NVIDIA driver 580+ is installed
+- NVIDIA driver 550+ (pause/resume) or 580+ (migration) is installed
 
 If requirements are not met, specific warnings are logged and training continues in degraded mode.
 
@@ -444,6 +444,35 @@ The dashboard shows real-time status of all GPUs:
 - Memory usage per GPU
 - Running processes on each GPU
 - GPU health status
+
+---
+
+## Driver Requirements
+
+Flexium uses driver-level checkpointing for migration. Different driver versions enable different features:
+
+| Feature | NVIDIA Driver | Description |
+|---------|---------------|-------------|
+| Pause/Resume | 550+ | Pause training, free GPU, resume on same GPU |
+| GPU Migration | 580+ | Migrate training to a different GPU |
+
+### Check Capabilities
+
+```python
+from flexium.utils import get_capabilities, supports_migration
+
+# Check all capabilities
+caps = get_capabilities()
+print(f"Driver version: {caps['driver_version']}")
+print(f"Pause/Resume: {caps['pause_resume']}")
+print(f"GPU Migration: {caps['migration']}")
+
+# Quick check for migration support
+if supports_migration():
+    print("GPU migration available!")
+else:
+    print("Only pause/resume on same GPU")
+```
 
 ---
 

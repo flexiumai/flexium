@@ -59,7 +59,7 @@ Flexium enables **live GPU migration** for PyTorch training jobs. Your training 
 
 **Problem**: Traditional approaches to GPU migration (moving tensors with `.to()`) leave memory fragments due to PyTorch's caching allocator.
 
-**Solution**: Flexium captures and restores the complete GPU state at driver level (driver 580+), guaranteeing zero residue.
+**Solution**: Flexium captures and restores the complete GPU state at driver level, guaranteeing zero residue. Requires driver 550+ for pause/resume, 580+ for GPU migration.
 
 ### In-Process Migration
 
@@ -125,7 +125,9 @@ device: cuda:0
 
 - Python 3.8+
 - PyTorch 2.0+ with CUDA 12.4+
-- **NVIDIA Driver 580+** (required for zero-residue migration)
+- NVIDIA Driver:
+    - **550+** for pause/resume (same GPU)
+    - **580+** for GPU migration (different GPU)
 - Linux x86_64
 
 ---

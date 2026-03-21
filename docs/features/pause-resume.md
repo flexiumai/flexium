@@ -2,9 +2,11 @@
 
 Flexium provides pause and resume capabilities for long-running training jobs.
 
+**Driver Requirement:** NVIDIA 550+ (pause/resume on same GPU), 580+ (resume on different GPU)
+
 ## Overview
 
-Training jobs can be paused at any point and resumed later, whether on the same GPU or a different GPU on the same machine.
+Training jobs can be paused at any point and resumed later. With driver 550+, you can resume on the same GPU. With driver 580+, you can resume on any GPU on the same machine.
 
 ## How It Works
 

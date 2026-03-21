@@ -1,5 +1,7 @@
 # GPU Error Recovery
 
+**Driver Requirement:** NVIDIA 580+ (requires GPU migration capability)
+
 Flexium provides automatic GPU error recovery, allowing training to survive and recover from common CUDA errors like OOM, ECC errors, and device asserts.
 
 ## Overview

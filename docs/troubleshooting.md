@@ -169,7 +169,7 @@ Common issues and their solutions when using flexium.
 3. **Check driver version:**
    ```bash
    nvidia-smi --query-gpu=driver_version --format=csv,noheader
-   # Must be 580+
+   # 550+ for pause/resume, 580+ for GPU migration
    ```
 
 ---
