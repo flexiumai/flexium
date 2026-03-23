@@ -27,8 +27,13 @@ PyCharm Tips:
 from __future__ import annotations
 
 import argparse
+import os
 import random
+import sys
 import time
+
+# Add repo root to path for development
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import numpy as np
 import torch
@@ -100,7 +105,7 @@ def main() -> None:
 
     # === FLEXIUM: Just 2 lines! ===
     if not args.disabled:
-        flexium.init(server=args.server, device=args.device)
+        flexium.init(server="app.flexium.ai/test_work_space", device=args.device)
 
     # =====================================================
     # EVERYTHING BELOW IS 100% STANDARD PYTORCH CODE
