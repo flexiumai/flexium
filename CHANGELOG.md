@@ -5,6 +5,25 @@ All notable changes to Flexium.AI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-23
+
+### Added
+- New `flexium.init()` API - simpler than `flexium.auto.run()` context manager
+- `disabled` parameter to bypass flexium for benchmarking
+- Framework compatibility documentation for Hugging Face, timm, fastai
+
+### Fixed
+- Connection failures through Cloudflare proxy (now uses polling transport)
+- WebSocket upgrade errors with "Invalid empty packet received"
+
+### Changed
+- Simplified API: `flexium.init()` replaces `flexium.auto.run()` as recommended API
+- Transport changed from WebSocket to polling for better proxy compatibility
+
+### Removed
+- FlexiumCallback for PyTorch Lightning (use `flexium.init()` instead)
+- gRPC transport (WebSocket/polling only now)
+
 ## [0.1.1] - 2026-03-10
 
 ### Fixed
