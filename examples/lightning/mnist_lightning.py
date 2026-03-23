@@ -1,33 +1,28 @@
 #!/usr/bin/env python
 """MNIST training with PyTorch Lightning and Flexium.
 
-This demonstrates Flexium integration with PyTorch Lightning using
-the FlexiumCallback. Migration happens transparently via the heartbeat
-thread - no changes needed to standard Lightning code!
+This demonstrates that Flexium works seamlessly with PyTorch Lightning -
+just call flexium.init() and your existing Lightning code works unchanged!
 
-Compare with examples/simple/mnist_train_auto.py which uses raw PyTorch.
+No special callback or integration needed. Driver-level migration
+handles device remapping automatically.
 
 Usage:
-    # With orchestrator
-    export GPU_ORCHESTRATOR=localhost:80
+    # Set server and run
+    export FLEXIUM_SERVER=app.flexium.ai/myworkspace
     python examples/lightning/mnist_lightning.py
 
-    # With orchestrator (inline)
-    python examples/lightning/mnist_lightning.py --orchestrator localhost:80
+    # Or with server inline
+    python examples/lightning/mnist_lightning.py --server app.flexium.ai/myworkspace
 
-    # Baseline benchmark (no flexium - good for debugging)
-    python examples/lightning/mnist_lightning.py --disabled
-
-PyCharm Tips:
-    - For debugging, use --disabled flag
-    - Set working directory to the project root
-    - Add --epochs 1 for quick testing
+    # Baseline benchmark (no flexium)
+    python examples/lightning/mnist_lightning.py --no-flexium
 """
 
 from __future__ import annotations
 
 import argparse
-from typing import Any, Tuple
+from typing import Tuple
 
 import pytorch_lightning as pl
 import torch
@@ -35,8 +30,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
-from flexium.lightning import FlexiumCallback
 
 
 class MNISTModel(pl.LightningModule):
@@ -156,14 +149,9 @@ def main() -> None:
         description="MNIST with PyTorch Lightning and Flexium"
     )
     parser.add_argument(
-        "--orchestrator",
-        default="localhost:80",
-        help="Orchestrator address (e.g., localhost:80)",
-    )
-    parser.add_argument(
-        "--device",
+        "--server",
         default=None,
-        help="Initial device (or set GPU_DEVICE env var)",
+        help="Flexium server (e.g., app.flexium.ai/myworkspace)",
     )
     parser.add_argument(
         "--epochs",
@@ -178,9 +166,9 @@ def main() -> None:
         help="Batch size (default: 64)",
     )
     parser.add_argument(
-        "--disabled",
+        "--no-flexium",
         action="store_true",
-        help="Disable flexium for baseline benchmark",
+        help="Run without flexium (baseline)",
     )
     parser.add_argument(
         "--seed",
@@ -193,37 +181,33 @@ def main() -> None:
     # Set seed for reproducibility
     pl.seed_everything(args.seed)
 
-    # Create model and data module
+    # === FLEXIUM: Just 2 lines! ===
+    if not args.no_flexium:
+        import flexium
+        flexium.init(server=args.server)
+
+    # === Standard PyTorch Lightning code below ===
+    # No changes needed!
+
     model = MNISTModel()
     datamodule = MNISTDataModule(batch_size=args.batch_size)
 
-    # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
-    # Add FlexiumCallback to enable transparent GPU migration
-    flexium_callback = FlexiumCallback(
-        orchestrator=args.orchestrator,
-        device=args.device,
-        disabled=args.disabled,
-    )
-
-    # Create trainer with Flexium callback
-    # Everything else is standard PyTorch Lightning!
     trainer = pl.Trainer(
         max_epochs=args.epochs,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices=1,
-        callbacks=[flexium_callback],
         enable_progress_bar=True,
         log_every_n_steps=50,
     )
 
     # Train the model
-    # Migration happens transparently via heartbeat thread
+    # Migration happens transparently via dashboard
     trainer.fit(model, datamodule)
 
     print("\nTraining complete!")
-    if not args.disabled:
+    if not args.no_flexium:
         import flexium.auto
-        print(f"Final device: {flexium.auto.get_device()}")
+        print(f"Final device: {flexium.auto.get_physical_device()}")
 
 
 if __name__ == "__main__":
