@@ -111,6 +111,7 @@ class OrchestratorClient:
         self._preemptible: bool = True
         self._migratable: bool = True
         self._start_time: float = 0.0
+        self._is_paused: bool = False  # Track if process is paused for reconnection
 
         # Callbacks for migration/pause commands
         self._migration_callback: Optional[Callable[[str], None]] = None
@@ -423,11 +424,13 @@ class OrchestratorClient:
         """Attempt to reconnect and re-register."""
         try:
             if self.connect():
+                # Use __PAUSED__ if we're reconnecting while paused
+                device = "__PAUSED__" if self._is_paused else self._current_device
                 logger.info("[flexium] Connected, re-registering...")
-                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={self._current_device}")
+                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={device}, is_paused={self._is_paused}")
                 result = self.register(
                     process_id=self._process_id,
-                    device=self._current_device,
+                    device=device,
                     metadata=self._metadata,
                     min_gpus=self._min_gpus,
                     max_gpus=self._max_gpus,
@@ -464,6 +467,14 @@ class OrchestratorClient:
         old_device = self._current_device
         self._current_device = new_device
         logger.info(f"Device updated: {old_device} -> {new_device}")
+
+    def set_paused(self, paused: bool) -> None:
+        """Set the paused state for reconnection handling.
+
+        Parameters:
+            paused: True if process is paused, False if running.
+        """
+        self._is_paused = paused
 
     def complete_migration(
         self,

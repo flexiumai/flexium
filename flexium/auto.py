@@ -639,6 +639,10 @@ def _do_pause() -> None:
     # while we're handling the pause/resume internally
     _pause_in_progress = True
 
+    # Mark as paused for reconnection handling
+    if _orchestrator_client:
+        _orchestrator_client.set_paused(True)
+
     print("\n[flexium] === PAUSING ===")
     print(f"[flexium] _current_device={_current_device}, _physical_device={_physical_device}")
     sys.stdout.flush()
@@ -762,6 +766,9 @@ def _do_pause() -> None:
                             print("[flexium] WARNING: Resume failed!")
                         else:
                             print("[flexium] === RESUMED ===")
+                            # Mark as no longer paused
+                            if _orchestrator_client:
+                                _orchestrator_client.set_paused(False)
 
                         sys.stdout.flush()
 
@@ -800,6 +807,9 @@ def _do_pause() -> None:
                         if success:
                             print("[flexium] === AUTO-RESUMED (local mode) ===")
                             print("[flexium] Running without orchestrator. Will reconnect when available.")
+                            # Mark as no longer paused
+                            if _orchestrator_client:
+                                _orchestrator_client.set_paused(False)
                         else:
                             print("[flexium] WARNING: Auto-resume failed!")
 
