@@ -151,17 +151,20 @@ class WebSocketTransport(Transport):
         self._sio = self._create_socket()
 
         try:
+            # Use polling transport only - more reliable through proxies/Cloudflare
+            # and avoids sticky session issues with multiple gunicorn workers.
+            # WebSocket upgrade fails when requests hit different workers.
             self._sio.connect(
                 self._server_url,
                 socketio_path="/socket.io",
-                transports=["websocket", "polling"],
+                transports=["polling"],
                 wait_timeout=10,
                 headers={},
                 auth={"workspace": self._workspace},
             )
             return True
         except Exception as e:
-            logger.debug(f"WebSocket connection failed: {e}")
+            logger.debug(f"Connection failed: {e}")
             return False
 
     def disconnect(self) -> None:
