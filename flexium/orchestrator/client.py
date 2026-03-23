@@ -220,6 +220,7 @@ class OrchestratorClient:
         preemptible: bool = True,
         migratable: bool = True,
         start_time: float = 0.0,
+        _skip_gpu_lookup: bool = False,
     ) -> Optional[str]:
         """Register with the orchestrator.
 
@@ -243,18 +244,25 @@ class OrchestratorClient:
         logger.info(f"[flexium] register() called for {process_id} on {device}")
 
         # Get GPU UUID for reliable identification
+        # Skip if reconnecting (GPU may be paused/checkpointed and pynvml will hang)
         gpu_uuid = ""
         gpu_name = ""
-        try:
-            from flexium.utils.gpu_info import get_gpu_info
-            logger.info(f"[flexium] Getting GPU info for {device}...")
-            gpu_info = get_gpu_info(device)
-            logger.info(f"[flexium] Got GPU info: {gpu_info}")
-            if gpu_info:
-                gpu_uuid = gpu_info.uuid
-                gpu_name = gpu_info.name
-        except Exception as e:
-            logger.warning(f"[flexium] Failed to get GPU info: {e}")
+        if _skip_gpu_lookup:
+            # Use cached values from previous registration
+            gpu_uuid = self._gpu_uuid
+            gpu_name = self._gpu_name
+            logger.info(f"[flexium] Using cached GPU info: {gpu_uuid}, {gpu_name}")
+        else:
+            try:
+                from flexium.utils.gpu_info import get_gpu_info
+                logger.info(f"[flexium] Getting GPU info for {device}...")
+                gpu_info = get_gpu_info(device)
+                logger.info(f"[flexium] Got GPU info: {gpu_info}")
+                if gpu_info:
+                    gpu_uuid = gpu_info.uuid
+                    gpu_name = gpu_info.name
+            except Exception as e:
+                logger.warning(f"[flexium] Failed to get GPU info: {e}")
 
         # Store for reconnection
         self._process_id = process_id
@@ -429,6 +437,7 @@ class OrchestratorClient:
                     preemptible=self._preemptible,
                     migratable=self._migratable,
                     start_time=self._start_time,
+                    _skip_gpu_lookup=True,  # GPU may be paused, skip pynvml call
                 )
                 if result:
                     logger.info("[flexium] Orchestrator reconnected!")
