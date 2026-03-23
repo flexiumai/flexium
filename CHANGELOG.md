@@ -19,13 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial public release
 - `flexium.auto.run()` context manager for migration-enabled training
 - Live GPU migration with zero memory residue (requires NVIDIA driver 580+)
-- gRPC-based orchestrator for multi-process coordination
+- WebSocket-based server communication
 - Web dashboard for monitoring and control
-- CLI tool (`flexium-ctl`) for server and process management
 - Pause/Resume functionality to free GPU completely
-- Automatic GPU error recovery (OOM, ECC errors, device assert)
-- Graceful degradation when orchestrator is unavailable
-- PyTorch Lightning integration via `FlexiumCallback`
+- Graceful degradation when server is unavailable
+- Framework compatibility: PyTorch Lightning, Hugging Face, timm, and more
 - GPU UUID targeting for specific hardware selection
 
 ### Requirements

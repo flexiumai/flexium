@@ -67,18 +67,19 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 
     ```python
     # train.py - Same code, just add 2 lines
-    import flexium.auto
+    import flexium
+    flexium.init()
+
     import torch
 
-    with flexium.auto.run():
-        model = Net().cuda()
-        optimizer = torch.optim.Adam(model.parameters())
+    model = Net().cuda()
+    optimizer = torch.optim.Adam(model.parameters())
 
-        for epoch in range(100):
-            for batch in dataloader:
-                # ... training ...
-                pass
-            print(f"Epoch {epoch} complete")
+    for epoch in range(100):
+        for batch in dataloader:
+            # ... training ...
+            pass
+        print(f"Epoch {epoch} complete")
     ```
 
     **When colleague needs the GPU:**
@@ -122,22 +123,22 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 === "✅ With flexium (simple)"
 
     ```python
-    import flexium.auto
+    import flexium
+    flexium.init()
 
-    with flexium.auto.run():
-        model = LargeModel().cuda()
-        optimizer = torch.optim.Adam(model.parameters())
+    model = LargeModel().cuda()
+    optimizer = torch.optim.Adam(model.parameters())
 
-        for epoch in range(100):
-            for batch in dataloader:
-                # Simple recoverable - if OOM, batch is lost but training continues
-                with flexium.auto.recoverable():
-                    data, target = batch[0].cuda(), batch[1].cuda()
-                    output = model(data)
-                    loss = criterion(output, target)
-                    loss.backward()
-                    optimizer.step()
-                    optimizer.zero_grad()
+    for epoch in range(100):
+        for batch in dataloader:
+            # Simple recoverable - if OOM, batch is lost but training continues
+            with flexium.auto.recoverable():
+                data, target = batch[0].cuda(), batch[1].cuda()
+                output = model(data)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
 
     # Result:
     # - At epoch 47, batch 892: OOM detected
@@ -158,7 +159,8 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 === "✅ With flexium (retry)"
 
     ```python
-    import flexium.auto
+    import flexium
+    flexium.init()
 
     # Use decorator to RETRY the same batch on new GPU
     @flexium.auto.recoverable(retries=3)
@@ -169,13 +171,12 @@ These examples show the pain points of GPU management **without** Flexium.AI and
         optimizer.step()
         optimizer.zero_grad()
 
-    with flexium.auto.run():
-        model = LargeModel().cuda()
-        optimizer = torch.optim.Adam(model.parameters())
+    model = LargeModel().cuda()
+    optimizer = torch.optim.Adam(model.parameters())
 
-        for epoch in range(100):
-            for batch in dataloader:
-                train_step(model, batch[0], batch[1], optimizer, criterion)
+    for epoch in range(100):
+        for batch in dataloader:
+            train_step(model, batch[0], batch[1], optimizer, criterion)
 
     # Result:
     # - At epoch 47, batch 892: OOM detected
@@ -360,19 +361,19 @@ These examples show the pain points of GPU management **without** Flexium.AI and
 === "✅ With flexium"
 
     ```python
-    import flexium.auto
+    import flexium
+    flexium.init()
 
-    with flexium.auto.run():
-        model = BigModel().cuda()
+    model = BigModel().cuda()
 
-        for epoch in range(1000):
-            for batch in dataloader:
-                # Day 3: Server reboots
-                #        -> Job paused, resumes after reboot
-                #
-                # Day 7: Colleague needs GPU
-                #        -> Migrate job to cuda:2 via dashboard, continues without interruption
-                pass
+    for epoch in range(1000):
+        for batch in dataloader:
+            # Day 3: Server reboots
+            #        -> Job paused, resumes after reboot
+            #
+            # Day 7: Colleague needs GPU
+            #        -> Migrate job to cuda:2 via dashboard, continues without interruption
+            pass
 
     # Result: 2-week job completes in ~2 weeks
     # Interruptions handled with migration via dashboard
@@ -400,7 +401,9 @@ The simplest way to add flexium:
 ??? example "Minimal Training Example"
 
     ```python
-    import flexium.auto
+    import flexium
+    flexium.init()
+
     import torch
     import torch.nn as nn
 
@@ -412,24 +415,23 @@ The simplest way to add flexium:
         def forward(self, x):
             return self.fc(x)
 
-    with flexium.auto.run():
-        # Everything inside is standard PyTorch
-        model = SimpleNet().cuda()
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    # Everything below is standard PyTorch
+    model = SimpleNet().cuda()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
-        for i in range(1000):
-            x = torch.randn(32, 100).cuda()
-            y = torch.randint(0, 10, (32,)).cuda()
+    for i in range(1000):
+        x = torch.randn(32, 100).cuda()
+        y = torch.randint(0, 10, (32,)).cuda()
 
-            output = model(x)
-            loss = nn.functional.cross_entropy(output, y)
+        output = model(x)
+        loss = nn.functional.cross_entropy(output, y)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-            if i % 100 == 0:
-                print(f"Step {i}, Loss: {loss.item():.4f}")
+        if i % 100 == 0:
+            print(f"Step {i}, Loss: {loss.item():.4f}")
     ```
 
 ---
@@ -579,22 +581,18 @@ The demo:
 
 ## PyTorch Lightning
 
-Flexium integrates seamlessly with PyTorch Lightning using the `FlexiumCallback`.
+Flexium works seamlessly with PyTorch Lightning - just call `flexium.init()` and your existing code works unchanged. No callback needed!
 
 ### Quick Start
 
 ```python
-from pytorch_lightning import Trainer
-from flexium.lightning import FlexiumCallback
+import flexium
+flexium.init()
 
-# Just add the callback - that's it!
-trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
-    max_epochs=100,
-    accelerator="gpu",
-    devices=1,
-)
-trainer.fit(model, dataloader)
+import pytorch_lightning as pl
+
+trainer = pl.Trainer(max_epochs=100, accelerator="gpu", devices=1)
+trainer.fit(model, datamodule)
 ```
 
 ### Complete MNIST Example with Lightning
@@ -605,14 +603,15 @@ trainer.fit(model, dataloader)
     #!/usr/bin/env python
     """MNIST training with PyTorch Lightning and Flexium."""
 
+    import flexium
+    flexium.init()  # Just 2 lines!
+
     import pytorch_lightning as pl
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
     from torch.utils.data import DataLoader
     from torchvision import datasets, transforms
-
-    from flexium.lightning import FlexiumCallback
 
 
     class MNISTModel(pl.LightningModule):
@@ -641,7 +640,6 @@ trainer.fit(model, dataloader)
             output = self(data)
             loss = F.nll_loss(output, target)
 
-            # Calculate accuracy
             pred = output.argmax(dim=1)
             acc = (pred == target).float().mean()
 
@@ -678,24 +676,16 @@ trainer.fit(model, dataloader)
 
 
     def main():
-        # Set seed for reproducibility
         pl.seed_everything(42)
 
-        # Create model and data
         model = MNISTModel()
         datamodule = MNISTDataModule()
 
-        # === THIS IS THE ONLY CHANGE FOR FLEXIUM ===
-        flexium_callback = FlexiumCallback(
-            orchestrator="app.flexium.ai/myworkspace",  # Or use FLEXIUM_SERVER env var
-        )
-
-        # Create trainer with Flexium callback
+        # Standard Lightning code - no changes needed!
         trainer = pl.Trainer(
             max_epochs=10,
             accelerator="gpu",
             devices=1,
-            callbacks=[flexium_callback],
         )
 
         # Train - migration happens transparently!
@@ -719,64 +709,14 @@ python examples/lightning/mnist_lightning.py
 python examples/lightning/mnist_lightning.py --epochs 5
 
 # Baseline (no flexium)
-python examples/lightning/mnist_lightning.py --disabled
+python examples/lightning/mnist_lightning.py --no-flexium
 ```
 
-### Comparison: Raw PyTorch vs Lightning
+### Why It Just Works
 
-=== "Raw PyTorch"
+Flexium operates at a level below your Python code, so any framework built on PyTorch works automatically. No special integration, callbacks, or wrappers needed.
 
-    ```python
-    import flexium.auto
-
-    with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
-        model = Net().cuda()
-        optimizer = torch.optim.Adam(model.parameters())
-
-        for epoch in range(10):
-            for batch in dataloader:
-                data, target = batch[0].cuda(), batch[1].cuda()
-                # ... training loop ...
-    ```
-
-=== "PyTorch Lightning"
-
-    ```python
-    from flexium.lightning import FlexiumCallback
-
-    trainer = Trainer(
-        callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
-        max_epochs=10,
-        accelerator="gpu",
-        devices=1,
-    )
-    trainer.fit(model, dataloader)
-    ```
-
-Both approaches provide the same transparent migration capability. Choose based on your preference:
-
-- **Raw PyTorch**: More control, minimal dependencies
-- **Lightning**: Less boilerplate, built-in features (logging, checkpointing, etc.)
-
-### FlexiumCallback Options
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `orchestrator` | `str` | `None` | Orchestrator address (host:port) |
-| `device` | `str` | `None` | Initial device (auto-detected if not set) |
-| `disabled` | `bool` | `False` | Disable Flexium for debugging |
-
-### Installation
-
-```bash
-# Install Flexium with Lightning support
-pip install flexium[lightning]
-
-# Or install Lightning separately
-pip install pytorch-lightning>=2.0.0
-```
-
-For more details, see [Lightning Integration](features/lightning-integration.md).
+Supported frameworks include PyTorch Lightning, Hugging Face Transformers, Accelerate, timm, FastAI, and more. See [Framework Compatibility](features/framework-compatibility.md) for the full list.
 
 ---
 
@@ -865,20 +805,18 @@ Run multiple training jobs and migrate between them:
 
 ```python
 # job1.py
-import flexium.auto
+import flexium
+flexium.init(server="app.flexium.ai/myworkspace")
 
-with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
-    # Training job 1
-    model1 = Model1().cuda()
-    train(model1)
+model1 = Model1().cuda()
+train(model1)
 
 # job2.py
-import flexium.auto
+import flexium
+flexium.init(server="app.flexium.ai/myworkspace")
 
-with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
-    # Training job 2
-    model2 = Model2().cuda()
-    train(model2)
+model2 = Model2().cuda()
+train(model2)
 ```
 
 Then use the dashboard at [app.flexium.ai](https://app.flexium.ai) to manage:
@@ -895,7 +833,7 @@ Then use the dashboard at [app.flexium.ai](https://app.flexium.ai) to manage:
 ??? example "Error Handling Pattern"
 
     ```python
-    import flexium.auto
+    import flexium
     import torch
     import logging
 
@@ -904,17 +842,18 @@ Then use the dashboard at [app.flexium.ai](https://app.flexium.ai) to manage:
 
 
     def train():
-        with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
-            model = MyModel().cuda()
-            optimizer = torch.optim.Adam(model.parameters())
+        flexium.init(server="app.flexium.ai/myworkspace")
 
-            for epoch in range(100):
-                try:
-                    for batch in dataloader:
-                        # Training step
-                        loss = train_step(model, optimizer, batch)
+        model = MyModel().cuda()
+        optimizer = torch.optim.Adam(model.parameters())
 
-                except RuntimeError as e:
+        for epoch in range(100):
+            try:
+                for batch in dataloader:
+                    # Training step
+                    loss = train_step(model, optimizer, batch)
+
+            except RuntimeError as e:
                     if "CUDA out of memory" in str(e):
                         logger.error("OOM error - consider migrating to GPU with more memory")
                         raise

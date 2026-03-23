@@ -29,24 +29,31 @@ Flexium provides three patterns, from simplest to most control:
 This is the simplest approach. If a GPU error occurs, Flexium migrates to a new GPU and suppresses the exception. The code inside the `with` block that failed is **not retried** - that batch/operation is lost, but training continues with the next iteration.
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    model = Net().cuda()
-    optimizer = torch.optim.Adam(model.parameters())
+model = Net().cuda()
+optimizer = torch.optim.Adam(model.parameters())
 
-    for batch in dataloader:
-        with flexium.auto.recoverable():
-            # If OOM happens here, this batch is LOST
-            # but we migrate to new GPU and continue
-            output = model(batch.cuda())
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+for batch in dataloader:
+    with flexium.auto.recoverable():
+        # If OOM happens here, this batch is LOST
+        # but we migrate to new GPU and continue
+        output = model(batch.cuda())
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 
-        # Training continues here on next batch
+    # Training continues here on next batch
 ```
+
+!!! note "Using explicit scope control"
+    You can also use `flexium.auto.run()` instead of `flexium.init()`:
+    ```python
+    with flexium.auto.run():
+        # ... same code as above
+    ```
 
 **Output when OOM occurs:**
 ```
@@ -68,7 +75,8 @@ with flexium.auto.run():
 Wrap your training step in a function with the `@recoverable` decorator. If a GPU error occurs, Flexium migrates to a new GPU and **calls the function again** with the same arguments.
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
 @flexium.auto.recoverable(retries=3)
 def train_step(model, batch, optimizer, criterion):
@@ -79,13 +87,12 @@ def train_step(model, batch, optimizer, criterion):
     optimizer.zero_grad()
     return loss.item()
 
-with flexium.auto.run():
-    model = Net().cuda()
-    optimizer = torch.optim.Adam(model.parameters())
+model = Net().cuda()
+optimizer = torch.optim.Adam(model.parameters())
 
-    for batch in dataloader:
-        loss = train_step(model, batch, optimizer, criterion)
-        # If OOM happened, train_step was retried on new GPU
+for batch in dataloader:
+    loss = train_step(model, batch, optimizer, criterion)
+    # If OOM happened, train_step was retried on new GPU
 ```
 
 You can also use `@recoverable` without parentheses (uses default 3 retries):
@@ -112,19 +119,19 @@ def train_step(model, batch):
 You write the retry loop structure. This is useful when you need custom logic between retries.
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    model = Net().cuda()
+model = Net().cuda()
 
-    for batch in dataloader:
-        for attempt in flexium.auto.recoverable(retries=3):
-            with attempt:
-                output = model(batch.cuda())
-                loss = criterion(output, target)
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+for batch in dataloader:
+    for attempt in flexium.auto.recoverable(retries=3):
+        with attempt:
+            output = model(batch.cuda())
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 ```
 
 ---

@@ -259,13 +259,13 @@ export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 ```bash
 # Create test script
 cat > test_flexium.py << 'EOF'
-import flexium.auto
-import torch
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    x = torch.zeros(100, 100).cuda()
-    print(f"Tensor on: {x.device}")
-    print("Flexium integration working!")
+import torch
+x = torch.zeros(100, 100).cuda()
+print(f"Tensor on: {x.device}")
+print("Flexium integration working!")
 EOF
 
 # Run test

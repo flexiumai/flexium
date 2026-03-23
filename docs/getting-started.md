@@ -61,7 +61,8 @@ Sign up for free at [app.flexium.ai](https://app.flexium.ai) to create your work
 Add just 2 lines to your existing code:
 
 ```python
-import flexium.auto  # Add this import
+import flexium
+flexium.init()  # That's it!
 
 # ... your existing imports ...
 import torch
@@ -77,19 +78,18 @@ class Net(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-# Training
-with flexium.auto.run():  # Wrap your training
-    model = Net().cuda()  # Standard PyTorch!
-    optimizer = torch.optim.Adam(model.parameters())
+# Training - no changes needed!
+model = Net().cuda()  # Standard PyTorch!
+optimizer = torch.optim.Adam(model.parameters())
 
-    for epoch in range(100):
-        for batch in dataloader:
-            data, target = batch[0].cuda(), batch[1].cuda()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+for epoch in range(100):
+    for batch in dataloader:
+        data, target = batch[0].cuda(), batch[1].cuda()
+        output = model(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 ```
 
 That's it! Your training is now migration-enabled.
@@ -137,7 +137,19 @@ device: cuda:0
 ### Inline Parameters
 
 ```python
-with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace", device="cuda:0"):
+import flexium
+flexium.init(server="app.flexium.ai/myworkspace", device="cuda:0")
+```
+
+### Explicit Scope Control (Advanced)
+
+For advanced use cases where you need explicit scope control:
+
+```python
+import flexium.auto
+
+with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
+    # Training code with explicit scope
     ...
 ```
 

@@ -23,11 +23,19 @@ Traditional approaches (like `model.to(device)`) leave memory fragments due to P
 Zero-residue migration is automatic:
 
 ```python
+import flexium
+flexium.init()
+
+# Your training code here
+# Migration happens when triggered via dashboard
+train_model()
+```
+
+**Or with explicit scope control:**
+```python
 import flexium.auto
 
 with flexium.auto.run():
-    # Your training code here
-    # Migration happens when triggered via dashboard
     train_model()
 ```
 

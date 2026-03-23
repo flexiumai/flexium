@@ -59,7 +59,7 @@ nav:
     - GPU Error Recovery: features/gpu-error-recovery.md
     - Pause/Resume: features/pause-resume.md
     - Graceful Degradation: features/graceful-degradation.md
-    - Lightning Integration: features/lightning-integration.md
+    - Framework Compatibility: features/framework-compatibility.md
   - Reference:
     - API Reference: api.md
   - Dashboard: https://app.flexium.ai

@@ -19,7 +19,7 @@ Flexium enables **live GPU migration** for PyTorch training jobs. Your training 
 
 - **Zero VRAM Residue**: When a process migrates, ALL memory is freed from the source GPU
 - **In-Process Migration**: Training continues in the same process, same loop iteration
-- **Transparent Integration**: Just wrap your code with `flexium.auto.run()`
+- **Transparent Integration**: Just call `flexium.init()` at the start of your script
 - **Pause/Resume**: Free GPU completely, resume later on any available GPU
 
 ### How You Use It
@@ -29,7 +29,7 @@ Flexium enables **live GPU migration** for PyTorch training jobs. Your training 
 │                   YOUR TRAINING PROCESS                   │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │                  flexium.auto.run()                 │  │
+│  │                    flexium.init()                   │  │
 │  │                                                     │  │
 │  │  ┌───────────────────────────────────────────────┐  │  │
 │  │  │            Your Training Code                 │  │  │
@@ -70,13 +70,25 @@ Unlike traditional approaches, Flexium migrates within the same process:
 
 ### Minimal Code Changes
 
+**Simple approach (recommended):**
+```python
+import flexium
+flexium.init()
+
+# 100% standard PyTorch code
+model = Net().cuda()
+optimizer = Adam(model.parameters())
+for batch in dataloader:
+    ...
+```
+
+**Explicit scope control (advanced):**
 ```python
 import flexium.auto
 
 with flexium.auto.run():
-    # 100% standard PyTorch code
+    # Flexium is active only within this block
     model = Net().cuda()
-    optimizer = Adam(model.parameters())
     for batch in dataloader:
         ...
 ```
@@ -108,8 +120,12 @@ export FLEXIUM_SERVER="app.flexium.ai/myworkspace"
 ### Inline Parameter
 
 ```python
-with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
-    ...
+import flexium
+flexium.init(server="app.flexium.ai/myworkspace")
+
+# Or with explicit scope:
+# with flexium.auto.run(orchestrator="app.flexium.ai/myworkspace"):
+#     ...
 ```
 
 ### Config File (`~/.flexiumrc`)

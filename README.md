@@ -29,19 +29,19 @@
 Flexium enables **live GPU migration** for PyTorch training. Move your training between GPUs without stopping, checkpointing, or losing progress.
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    # Your existing training code - unchanged
-    for epoch in range(100):
-        for batch in dataloader:
-            loss = model(batch).sum()
-            loss.backward()
-            optimizer.step()
-    # Training transparently migrates between GPUs when needed
+# Your existing training code - unchanged
+for epoch in range(100):
+    for batch in dataloader:
+        loss = model(batch).sum()
+        loss.backward()
+        optimizer.step()
+# Training transparently migrates between GPUs when needed
 ```
 
-**Zero code changes. Zero downtime. Zero memory residue.**
+**Minimal code changes. Zero downtime. Zero memory residue.**
 
 ## Features
 
@@ -67,13 +67,13 @@ Sign up for free at [https://flexium.ai](https://flexium.ai)
 ### 3. Add Two Lines to Your Training
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    # Your existing training code - no changes needed
-    model = MyModel().cuda()
-    for epoch in range(100):
-        train_one_epoch(model)
+# Your existing training code - no changes needed
+model = MyModel().cuda()
+for epoch in range(100):
+    train_one_epoch(model)
 ```
 
 That's it! Your training is now migratable.
@@ -84,8 +84,8 @@ That's it! Your training is now migratable.
 ┌─────────────────────────────────────────────────────────────┐
 │                    YOUR TRAINING CODE                        │
 │                                                              │
-│   with flexium.auto.run():                                  │
-│       model.train()   ◄─── Training runs normally           │
+│   flexium.init()                                            │
+│   model.train()   ◄─── Training runs normally               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               │ Heartbeat
@@ -111,23 +111,26 @@ Your training code never knows it moved.
 
 ### GPU Sharing
 ```python
+import flexium
+flexium.init()
 # Free up GPUs for teammates without killing your job
-with flexium.auto.run():
-    train_model()  # Can be migrated via dashboard anytime
+train_model()  # Can be migrated via dashboard anytime
 ```
 
 ### Resource Optimization
 ```python
+import flexium
+flexium.init()
 # Move jobs between GPUs based on memory requirements
-with flexium.auto.run():
-    train_model()  # Migrate to GPU with more VRAM when needed
+train_model()  # Migrate to GPU with more VRAM when needed
 ```
 
 ### Pause for Priority Jobs
 ```python
+import flexium
+flexium.init()
 # Pause your job to free GPU, resume later
-with flexium.auto.run():
-    train_model()  # Pause via dashboard, resume on any GPU
+train_model()  # Pause via dashboard, resume on any GPU
 ```
 
 ## Requirements

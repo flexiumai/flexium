@@ -114,10 +114,12 @@ Common issues and their solutions when using flexium.
 
 1. **Use `.cuda()` consistently:**
    ```python
-   with flexium.auto.run():
-       model.cuda()       # Correct
-       model.to("cuda")   # Correct
-       model.to("cuda:0") # Correct - will be redirected
+   import flexium
+   flexium.init()
+
+   model.cuda()       # Correct
+   model.to("cuda")   # Correct
+   model.to("cuda:0") # Correct - will be redirected
    ```
 
 ---
@@ -216,10 +218,18 @@ FLEXIUM_LOG_LEVEL=DEBUG python train.py
 
 ### Debug Mode
 
+For debugging, use the `disabled` parameter:
 ```python
-# Disable flexium entirely for debugging
-with flexium.auto.run(disabled=True):
-    ...
+import flexium
+
+# Option 1: Use disabled parameter
+flexium.init(disabled=True)  # Flexium bypassed entirely
+
+# Option 2: Conditional init
+if not debugging:
+    flexium.init()
+
+# Your training code runs as normal PyTorch
 ```
 
 ### Automatic Debugger Detection
@@ -260,36 +270,37 @@ A: Minimal, typically < 2%. The main overhead is:
 
 A: Yes! flexium is transparent to mixed precision:
 ```python
-with flexium.auto.run():
-    model = Model().cuda()
-    scaler = torch.cuda.amp.GradScaler()
+import flexium
+flexium.init()
 
-    with torch.cuda.amp.autocast():
-        output = model(data)
-        loss = criterion(output, target)
+model = Model().cuda()
+scaler = torch.cuda.amp.GradScaler()
 
-    scaler.scale(loss).backward()
-    scaler.step(optimizer)
-    scaler.update()
+with torch.cuda.amp.autocast():
+    output = model(data)
+    loss = criterion(output, target)
+
+scaler.scale(loss).backward()
+scaler.step(optimizer)
+scaler.update()
 ```
 
-### Q: How do I exclude flexium in production?
+### Q: How do I disable flexium for certain environments?
 
-A: Use the disabled flag:
+A: Use the `disabled` parameter or conditionally call `flexium.init()`:
 ```python
 import os
+import flexium
 
-with flexium.auto.run(disabled=os.environ.get("PRODUCTION") == "1"):
-    ...
-```
+# Option 1: Use disabled parameter (recommended)
+flexium.init(disabled=os.environ.get("DISABLE_FLEXIUM") == "1")
 
-Or use environment variables:
-```bash
-# Development
-python train.py
+# Option 2: Conditional init
+if os.environ.get("PRODUCTION") == "1":
+    flexium.init()
 
-# Production
-PRODUCTION=1 python train.py  # Bypasses flexium
+# Your training code - works with or without flexium
+model = Net().cuda()
 ```
 
 ### Q: Where does the Flexium server run?

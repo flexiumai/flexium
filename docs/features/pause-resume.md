@@ -44,12 +44,20 @@ This ensures your paused training jobs don't hang indefinitely.
 ## Usage
 
 ```python
+import flexium
+flexium.init()
+
+# Your training code
+train_model()
+# Pause/resume is triggered via the dashboard
+```
+
+**Or with explicit scope control:**
+```python
 import flexium.auto
 
 with flexium.auto.run():
-    # Your training code
     train_model()
-    # Pause/resume is triggered via the dashboard
 ```
 
 Pause and resume are triggered through the web dashboard - there is no manual API for pausing within your code.
