@@ -430,7 +430,7 @@ class OrchestratorClient:
                 # Use __PAUSED__ if we're reconnecting while paused
                 device = "__PAUSED__" if self._is_paused else self._current_device
                 logger.info("[flexium] Connected, re-registering...")
-                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={device}, is_paused={self._is_paused}")
+                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={device}, is_paused={self._is_paused}, migratable={self._migratable}")
                 result = self.register(
                     process_id=self._process_id,
                     device=device,

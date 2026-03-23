@@ -578,3 +578,148 @@ class TestOrchestratorClientAlias:
         transport = MockTransport()
         client = WebSocketClient(transport=transport)
         assert client is not None
+
+
+class TestPausedReconnection:
+    """Tests for reconnection while paused.
+
+    When a client is paused and the server restarts, the client should:
+    1. Reconnect with device="__PAUSED__"
+    2. Preserve the migratable flag (False for driver 550-579)
+    3. Preserve the cached memory value
+    """
+
+    def test_set_paused_stores_state(self) -> None:
+        """Test set_paused stores paused state and memory."""
+        from flexium.orchestrator.client import OrchestratorClient
+        from flexium.orchestrator.transport import MockTransport
+
+        transport = MockTransport()
+        client = OrchestratorClient(transport=transport)
+
+        # Initially not paused
+        assert client._is_paused is False
+        assert client._cached_memory_reserved == 0
+
+        # Set paused with memory
+        client.set_paused(True, memory_reserved=1024 * 1024 * 1024)
+
+        assert client._is_paused is True
+        assert client._cached_memory_reserved == 1024 * 1024 * 1024
+
+    def test_set_paused_clear(self) -> None:
+        """Test set_paused(False) clears paused state."""
+        from flexium.orchestrator.client import OrchestratorClient
+        from flexium.orchestrator.transport import MockTransport
+
+        transport = MockTransport()
+        client = OrchestratorClient(transport=transport)
+
+        client.set_paused(True, memory_reserved=1024)
+        assert client._is_paused is True
+
+        client.set_paused(False)
+        assert client._is_paused is False
+        # Memory should be preserved (not cleared)
+        assert client._cached_memory_reserved == 1024
+
+    def test_try_reconnect_uses_paused_device(self) -> None:
+        """Test _try_reconnect uses __PAUSED__ device when paused."""
+        from flexium.orchestrator.client import OrchestratorClient, ConnectionState
+        from flexium.orchestrator.transport import MockTransport
+
+        # Track what device is sent during registration
+        registered_data = {}
+
+        def capture_handler(event, data):
+            if event == "register":
+                registered_data.update(data)
+                return {"success": True, "assigned_device": data.get("device", "cuda:0")}
+            return {"success": True}
+
+        transport = MockTransport(response_handler=capture_handler)
+        client = OrchestratorClient(transport=transport)
+
+        # Initial registration
+        client.register(process_id="test-123", device="cuda:0", migratable=False)
+        assert registered_data["device"] == "cuda:0"
+        assert registered_data["migratable"] is False
+
+        # Simulate pause
+        client.set_paused(True, memory_reserved=2048)
+
+        # Simulate disconnect
+        transport.disconnect()
+        client._state = ConnectionState.LOCAL_MODE
+
+        # Clear registered_data for reconnection
+        registered_data.clear()
+
+        # Reconnect
+        result = client._try_reconnect()
+
+        assert result is True
+        assert registered_data["device"] == "__PAUSED__"
+        assert registered_data["migratable"] is False
+        assert registered_data["memory_reserved"] == 2048
+
+    def test_try_reconnect_preserves_migratable_false(self) -> None:
+        """Test _try_reconnect preserves migratable=False for non-migratable drivers."""
+        from flexium.orchestrator.client import OrchestratorClient, ConnectionState
+        from flexium.orchestrator.transport import MockTransport
+
+        registered_migratable = []
+
+        def capture_handler(event, data):
+            if event == "register":
+                registered_migratable.append(data.get("migratable", True))
+                return {"success": True, "assigned_device": data.get("device", "cuda:0")}
+            return {"success": True}
+
+        transport = MockTransport(response_handler=capture_handler)
+        client = OrchestratorClient(transport=transport)
+
+        # Initial registration with migratable=False (driver 550-579)
+        client.register(process_id="test-123", device="cuda:0", migratable=False)
+        assert registered_migratable[-1] is False
+
+        # Simulate pause and disconnect
+        client.set_paused(True)
+        transport.disconnect()
+        client._state = ConnectionState.LOCAL_MODE
+
+        # Reconnect
+        client._try_reconnect()
+
+        # migratable should still be False
+        assert registered_migratable[-1] is False
+
+    def test_try_reconnect_not_paused_uses_original_device(self) -> None:
+        """Test _try_reconnect uses original device when not paused."""
+        from flexium.orchestrator.client import OrchestratorClient, ConnectionState
+        from flexium.orchestrator.transport import MockTransport
+
+        registered_devices = []
+
+        def capture_handler(event, data):
+            if event == "register":
+                registered_devices.append(data.get("device"))
+                return {"success": True, "assigned_device": data.get("device", "cuda:0")}
+            return {"success": True}
+
+        transport = MockTransport(response_handler=capture_handler)
+        client = OrchestratorClient(transport=transport)
+
+        # Initial registration
+        client.register(process_id="test-123", device="cuda:0")
+        assert registered_devices[-1] == "cuda:0"
+
+        # Simulate disconnect without pause
+        transport.disconnect()
+        client._state = ConnectionState.LOCAL_MODE
+
+        # Reconnect (not paused)
+        client._try_reconnect()
+
+        # Should use original device, not __PAUSED__
+        assert registered_devices[-1] == "cuda:0"
