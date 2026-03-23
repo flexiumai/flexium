@@ -283,6 +283,7 @@ class OrchestratorClient:
                     continue
 
             # Send register message
+            logger.info(f"[flexium] Sending register for {process_id} on {device}")
             response = self._transport.send("register", {
                 "process_id": process_id,
                 "device": device,
@@ -299,6 +300,7 @@ class OrchestratorClient:
                 "migratable": migratable,
                 "start_time": start_time,
             })
+            logger.info(f"[flexium] Register response: {response}")
 
             if response and response.get("success"):
                 self._current_device = response.get("assigned_device", device)
