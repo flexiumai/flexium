@@ -7,44 +7,122 @@ Complete API documentation for flexium.
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [flexium.auto.run()](#flexiumautorun)
-3. [flexium.auto.recoverable()](#flexiumautorecoverable)
-4. [flexium.auto.get_device()](#flexiumautoget_device)
-5. [flexium.auto.is_migration_enabled()](#flexiumautois_migration_enabled)
-6. [Additional Auto APIs](#additional-auto-apis)
-7. [PyTorch Lightning](#pytorch-lightning)
-8. [Configuration](#configuration)
-9. [Dashboard Controls](#dashboard-controls)
+2. [flexium.init()](#flexiuminit) (recommended)
+3. [flexium.auto.run()](#flexiumautorun) (explicit scope control)
+4. [flexium.auto.recoverable()](#flexiumautorecoverable)
+5. [flexium.auto.get_device()](#flexiumautoget_device)
+6. [flexium.auto.is_migration_enabled()](#flexiumautois_migration_enabled)
+7. [Additional Auto APIs](#additional-auto-apis)
+8. [PyTorch Lightning](#pytorch-lightning)
+9. [Configuration](#configuration)
+10. [Dashboard Controls](#dashboard-controls)
 
 ---
 
 ## Quick Start
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    # Standard PyTorch code - no changes needed!
-    model = Net().cuda()
-    optimizer = torch.optim.Adam(model.parameters())
+# Standard PyTorch code - no changes needed!
+model = Net().cuda()
+optimizer = torch.optim.Adam(model.parameters())
 
-    for epoch in range(100):
-        for batch in dataloader:
-            data, target = batch[0].cuda(), batch[1].cuda()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+for epoch in range(100):
+    for batch in dataloader:
+        data, target = batch[0].cuda(), batch[1].cuda()
+        output = model(data)
+        loss = criterion(output, target)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 ```
 
 That's it! Your training is now migratable via the Flexium dashboard.
 
 ---
 
+## flexium.init()
+
+Initialize Flexium for the entire process. This is the simplest way to enable GPU migration.
+
+```python
+def init(
+    server: Optional[str] = None,
+    device: Optional[str] = None,
+    disabled: bool = False,
+) -> None:
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `server` | `Optional[str]` | `None` | Flexium server address (host:port/workspace). If None, uses `FLEXIUM_SERVER` env var |
+| `device` | `Optional[str]` | `None` | Initial device. If None, uses `GPU_DEVICE` env var or "cuda:0" |
+| `disabled` | `bool` | `False` | If True, bypass Flexium entirely. Useful for benchmarking or A/B testing |
+
+### Examples
+
+**Basic usage (recommended):**
+```python
+import flexium
+flexium.init()
+
+model = Net().cuda()
+# Training code...
+```
+
+**With explicit server:**
+```python
+import flexium
+flexium.init(server="app.flexium.ai/myworkspace")
+
+model = Net().cuda()
+```
+
+**Disabled mode (for benchmarking):**
+```python
+import flexium
+flexium.init(disabled=True)  # Flexium is bypassed entirely
+
+model = Net().cuda()
+# Training runs without Flexium overhead
+```
+
+**Environment variables:**
+```bash
+export FLEXIUM_SERVER=app.flexium.ai/myworkspace
+export GPU_DEVICE=cuda:1
+python train.py
+```
+
+### Cleanup
+
+Flexium automatically cleans up on process exit via `atexit`. You can also manually shut down:
+
+```python
+import flexium
+flexium.init()
+
+# ... training ...
+
+flexium.shutdown()  # Optional: manual cleanup
+```
+
+### Related Functions
+
+```python
+flexium.is_initialized()  # Check if init() has been called
+flexium.shutdown()        # Manually shut down (usually not needed)
+```
+
+---
+
 ## flexium.auto.run()
 
-Context manager for transparent GPU management with live migration support.
+Context manager for transparent GPU management with live migration support. Use this for explicit scope control when you need finer control over when Flexium is active. For most cases, use `flexium.init()` instead.
 
 ```python
 @contextmanager
@@ -73,7 +151,7 @@ Priority (highest to lowest):
 
 ### Examples
 
-**Basic usage:**
+**Basic usage (prefer `flexium.init()` for simpler code):**
 ```python
 import flexium.auto
 
@@ -110,7 +188,7 @@ python train.py
 
 ### What Gets Patched
 
-When inside `run()`, the following PyTorch functions are patched for device routing:
+When inside `run()` or after `init()`, the following PyTorch functions are patched for device routing:
 
 | Function | Behavior |
 |----------|----------|
@@ -218,14 +296,14 @@ Current device string (e.g., `"cuda:0"`, `"cuda:1"`, `"cpu"`).
 ### Example
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    device = flexium.auto.get_device()
-    print(f"Training on: {device}")
+device = flexium.auto.get_device()
+print(f"Training on: {device}")
 
-    # Can be used for manual tensor placement
-    custom_tensor = torch.zeros(100).to(device)
+# Can be used for manual tensor placement
+custom_tensor = torch.zeros(100).to(device)
 ```
 
 ---
@@ -246,17 +324,16 @@ def is_migration_enabled() -> bool:
 ### Example
 
 ```python
-import flexium.auto
+import flexium
+flexium.init()
 
-with flexium.auto.run():
-    if flexium.auto.is_migration_enabled():
-        print("Migration available - can migrate via dashboard")
-    else:
-        print("Migration disabled - requirements not met")
+if flexium.auto.is_migration_enabled():
+    print("Migration available - can migrate via dashboard")
+else:
+    print("Migration disabled - requirements not met")
 
-    # Training works either way
-    model = Net().cuda()
-    ...
+# Training works either way
+model = Net().cuda()
 ```
 
 ### Notes
@@ -311,64 +388,52 @@ Returns a string like `"gpu-abc12345"`.
 
 ---
 
-## PyTorch Lightning
+## Framework Compatibility
 
-Flexium integrates with PyTorch Lightning via `FlexiumCallback`.
+Flexium works seamlessly with any PyTorch-based framework. No special integration code, callbacks, or wrappers needed - just call `flexium.init()` and your existing code works unchanged.
 
-### Quick Start
-
-```python
-from pytorch_lightning import Trainer
-from flexium.lightning import FlexiumCallback
-
-trainer = Trainer(
-    callbacks=[FlexiumCallback()],
-    accelerator="gpu",
-    devices=1,
-)
-trainer.fit(model, dataloader)
-```
-
-### FlexiumCallback
+### PyTorch Lightning
 
 ```python
-from flexium.lightning import FlexiumCallback
+import flexium
+flexium.init()
 
-class FlexiumCallback(Callback):
-    def __init__(
-        self,
-        orchestrator: Optional[str] = None,
-        device: Optional[str] = None,
-        disabled: bool = False,
-    ) -> None:
-```
+import pytorch_lightning as pl
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `orchestrator` | `str` | `None` | Flexium server address |
-| `device` | `str` | `None` | Initial device |
-| `disabled` | `bool` | `False` | Disable Flexium |
-
-### Example
-
-```python
-from pytorch_lightning import Trainer, LightningModule
-from flexium.lightning import FlexiumCallback
-
-class MyModel(LightningModule):
+class MyModel(pl.LightningModule):
     # Your standard Lightning module - no changes needed
     ...
 
-trainer = Trainer(
-    callbacks=[FlexiumCallback(orchestrator="app.flexium.ai/myworkspace")],
-    max_epochs=100,
-    accelerator="gpu",
-    devices=1,
-)
-trainer.fit(model, dataloader)
+trainer = pl.Trainer(max_epochs=100, accelerator="gpu", devices=1)
+trainer.fit(model, datamodule)
 ```
 
-For more details, see [Lightning Integration](features/lightning-integration.md).
+### Hugging Face Transformers
+
+```python
+import flexium
+flexium.init()
+
+from transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments
+
+model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
+trainer = Trainer(model=model, args=training_args, train_dataset=dataset)
+trainer.train()
+```
+
+### Other Supported Frameworks
+
+| Framework | Status |
+|-----------|--------|
+| PyTorch | ✅ Full support |
+| PyTorch Lightning | ✅ Full support |
+| Hugging Face Transformers | ✅ Full support |
+| Hugging Face Accelerate | ✅ Full support |
+| timm | ✅ Full support |
+| torchvision | ✅ Full support |
+| FastAI | ✅ Full support |
+
+For more details and examples, see [Framework Compatibility](features/framework-compatibility.md).
 
 ---
 
