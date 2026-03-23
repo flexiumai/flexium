@@ -1213,11 +1213,17 @@ def _connect_orchestrator(config: FlexiumConfig) -> None:
 
     try:
         from flexium.orchestrator.client import OrchestratorClient
+        from flexium import _driver
 
         _orchestrator_client = OrchestratorClient(
             config.orchestrator,
             heartbeat_interval=config.heartbeat_interval,
         )
+
+        # Check if migration is supported (driver 580+)
+        # If config.migratable is False, respect that (user disabled it)
+        # If config.migratable is True, check driver capability
+        can_migrate = config.migratable and _driver.supports_migration()
 
         result = _orchestrator_client.register(
             process_id=_process_id,
@@ -1228,7 +1234,7 @@ def _connect_orchestrator(config: FlexiumConfig) -> None:
             can_share=config.can_share,
             priority=config.priority,
             preemptible=config.preemptible,
-            migratable=config.migratable,
+            migratable=can_migrate,
             start_time=_start_time,
         )
 
@@ -1316,7 +1322,14 @@ def run(
     # Show config
     print(f"[flexium] Process: {_process_id}")
     print(f"[flexium] Device:  {_current_device}")
-    print(f"[flexium] Migration: {'enabled' if _migration_enabled else 'DISABLED (requirements not met)'}")
+    # Show capability status based on driver version
+    if _migration_enabled:
+        if _driver.supports_migration():
+            print("[flexium] Capabilities: pause, resume, migrate (driver 580+)")
+        else:
+            print("[flexium] Capabilities: pause, resume (driver 550+, migration requires 580+)")
+    else:
+        print("[flexium] Capabilities: DISABLED (requirements not met)")
     if config.orchestrator:
         print(f"[flexium] Orchestrator: {config.orchestrator}")
     else:

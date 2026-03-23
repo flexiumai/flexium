@@ -3494,6 +3494,100 @@ class TestConnectOrchestratorPaths:
             auto._orchestrator_client = original_client
 
 
+class TestConnectOrchestratorMigratable:
+    """Tests for _connect_orchestrator migratable parameter."""
+
+    def test_connect_orchestrator_migratable_true_with_580(self) -> None:
+        """Test migratable=True is sent when driver supports migration (580+)."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(
+                orchestrator="localhost:80",
+                device="cuda:0",
+                migratable=True,
+            )
+
+            with patch("flexium.orchestrator.client.OrchestratorClient") as MockClient:
+                mock_instance = MagicMock()
+                mock_instance.register.return_value = "cuda:0"
+                MockClient.return_value = mock_instance
+
+                # Mock driver to support migration
+                with patch("flexium._driver.supports_migration", return_value=True):
+                    auto._connect_orchestrator(config)
+
+                # Check migratable was True
+                call_kwargs = mock_instance.register.call_args
+                assert call_kwargs[1]["migratable"] is True
+
+        finally:
+            auto._orchestrator_client = original_client
+
+    def test_connect_orchestrator_migratable_false_with_550(self) -> None:
+        """Test migratable=False is sent when driver only supports pause (550-579)."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(
+                orchestrator="localhost:80",
+                device="cuda:0",
+                migratable=True,  # User wants migration, but driver doesn't support
+            )
+
+            with patch("flexium.orchestrator.client.OrchestratorClient") as MockClient:
+                mock_instance = MagicMock()
+                mock_instance.register.return_value = "cuda:0"
+                MockClient.return_value = mock_instance
+
+                # Mock driver to NOT support migration (550-579)
+                with patch("flexium._driver.supports_migration", return_value=False):
+                    auto._connect_orchestrator(config)
+
+                # Check migratable was False despite config
+                call_kwargs = mock_instance.register.call_args
+                assert call_kwargs[1]["migratable"] is False
+
+        finally:
+            auto._orchestrator_client = original_client
+
+    def test_connect_orchestrator_migratable_respects_config_false(self) -> None:
+        """Test migratable=False from config is respected even with 580+ driver."""
+        import flexium.auto as auto
+        from flexium.config import FlexiumConfig
+
+        original_client = auto._orchestrator_client
+
+        try:
+            config = FlexiumConfig(
+                orchestrator="localhost:80",
+                device="cuda:0",
+                migratable=False,  # User disabled migration
+            )
+
+            with patch("flexium.orchestrator.client.OrchestratorClient") as MockClient:
+                mock_instance = MagicMock()
+                mock_instance.register.return_value = "cuda:0"
+                MockClient.return_value = mock_instance
+
+                # Mock driver to support migration
+                with patch("flexium._driver.supports_migration", return_value=True):
+                    auto._connect_orchestrator(config)
+
+                # Check migratable was False (user's choice)
+                call_kwargs = mock_instance.register.call_args
+                assert call_kwargs[1]["migratable"] is False
+
+        finally:
+            auto._orchestrator_client = original_client
+
+
 class TestCacheGpuInfoException:
     """Tests for _cache_gpu_info_at_startup exception handling."""
 
