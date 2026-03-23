@@ -639,9 +639,9 @@ def _do_pause() -> None:
     # while we're handling the pause/resume internally
     _pause_in_progress = True
 
-    # Mark as paused for reconnection handling
+    # Mark as paused for reconnection handling (with cached memory for display)
     if _orchestrator_client:
-        _orchestrator_client.set_paused(True)
+        _orchestrator_client.set_paused(True, memory_reserved=_cached_memory_reserved)
 
     print("\n[flexium] === PAUSING ===")
     print(f"[flexium] _current_device={_current_device}, _physical_device={_physical_device}")

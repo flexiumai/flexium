@@ -112,6 +112,7 @@ class OrchestratorClient:
         self._migratable: bool = True
         self._start_time: float = 0.0
         self._is_paused: bool = False  # Track if process is paused for reconnection
+        self._cached_memory_reserved: int = 0  # Memory before pause for reconnection
 
         # Callbacks for migration/pause commands
         self._migration_callback: Optional[Callable[[str], None]] = None
@@ -222,6 +223,7 @@ class OrchestratorClient:
         migratable: bool = True,
         start_time: float = 0.0,
         _skip_gpu_lookup: bool = False,
+        _memory_reserved: int = 0,
     ) -> Optional[str]:
         """Register with the orchestrator.
 
@@ -311,6 +313,7 @@ class OrchestratorClient:
                 "preemptible": preemptible,
                 "migratable": migratable,
                 "start_time": start_time,
+                "memory_reserved": _memory_reserved,
             })
             logger.info(f"[flexium] Register response: {response}")
 
@@ -441,6 +444,7 @@ class OrchestratorClient:
                     migratable=self._migratable,
                     start_time=self._start_time,
                     _skip_gpu_lookup=True,  # GPU may be paused, skip pynvml call
+                    _memory_reserved=self._cached_memory_reserved if self._is_paused else 0,
                 )
                 if result:
                     logger.info("[flexium] Orchestrator reconnected!")
@@ -468,13 +472,16 @@ class OrchestratorClient:
         self._current_device = new_device
         logger.info(f"Device updated: {old_device} -> {new_device}")
 
-    def set_paused(self, paused: bool) -> None:
+    def set_paused(self, paused: bool, memory_reserved: int = 0) -> None:
         """Set the paused state for reconnection handling.
 
         Parameters:
             paused: True if process is paused, False if running.
+            memory_reserved: Memory reserved before pause (for display during reconnect).
         """
         self._is_paused = paused
+        if paused and memory_reserved > 0:
+            self._cached_memory_reserved = memory_reserved
 
     def complete_migration(
         self,
