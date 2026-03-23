@@ -101,6 +101,50 @@ class TestRunContextManager:
                     assert auto._process_id.startswith("gpu-")
                     assert len(auto._process_id) > 4
 
+    def test_run_with_migration_enabled(self) -> None:
+        """Test run() works when migration is enabled (driver 550+).
+
+        This test ensures the capability status message doesn't raise NameError.
+        """
+        import flexium.auto as auto
+
+        original_enabled = auto._migration_enabled
+
+        try:
+            # Force migration enabled state
+            auto._migration_enabled = True
+
+            with patch("flexium.auto._connect_orchestrator"):
+                with patch("flexium.auto._disconnect_orchestrator"):
+                    with patch("flexium._driver.supports_migration", return_value=True):
+                        # Should not raise NameError
+                        with auto.run(orchestrator=""):
+                            pass
+        finally:
+            auto._migration_enabled = original_enabled
+
+    def test_run_with_pause_only(self) -> None:
+        """Test run() works with pause-only driver (550-579).
+
+        This test ensures the capability status message doesn't raise NameError.
+        """
+        import flexium.auto as auto
+
+        original_enabled = auto._migration_enabled
+
+        try:
+            # Force migration enabled state
+            auto._migration_enabled = True
+
+            with patch("flexium.auto._connect_orchestrator"):
+                with patch("flexium.auto._disconnect_orchestrator"):
+                    with patch("flexium._driver.supports_migration", return_value=False):
+                        # Should not raise NameError
+                        with auto.run(orchestrator=""):
+                            pass
+        finally:
+            auto._migration_enabled = original_enabled
+
 
 class TestHeartbeat:
     """Tests for heartbeat functionality."""

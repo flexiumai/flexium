@@ -1324,6 +1324,7 @@ def run(
     print(f"[flexium] Device:  {_current_device}")
     # Show capability status based on driver version
     if _migration_enabled:
+        from flexium import _driver
         if _driver.supports_migration():
             print("[flexium] Capabilities: pause, resume, migrate (driver 580+)")
         else:
