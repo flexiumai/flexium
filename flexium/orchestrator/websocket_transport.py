@@ -200,11 +200,17 @@ class WebSocketTransport(Transport):
             return None
 
         try:
+            logger.debug(f"[flexium] Emitting {event} to server")
             self._sio.emit(event, data)
+            logger.debug(f"[flexium] Waiting for {event}_response (timeout={timeout}s)")
             response = self._wait_for_response(event, timeout)
+            if response is None:
+                logger.warning(f"[flexium] No response for {event} (timeout or error)")
+            else:
+                logger.debug(f"[flexium] Got {event} response: {response.get('success', 'N/A')}")
             return response
         except Exception as e:
-            logger.debug(f"Send failed: {e}")
+            logger.warning(f"[flexium] Send {event} failed: {e}")
             self._connected = False
             return None
 
