@@ -154,6 +154,7 @@ class WebSocketTransport(Transport):
             # Use polling transport only - more reliable through proxies/Cloudflare
             # and avoids sticky session issues with multiple gunicorn workers.
             # WebSocket upgrade fails when requests hit different workers.
+            logger.info(f"[flexium] Connecting to {self._server_url} workspace={self._workspace}")
             self._sio.connect(
                 self._server_url,
                 socketio_path="/socket.io",
@@ -162,9 +163,10 @@ class WebSocketTransport(Transport):
                 headers={},
                 auth={"workspace": self._workspace},
             )
+            logger.info(f"[flexium] Socket.IO connected: {self._connected}")
             return True
         except Exception as e:
-            logger.debug(f"Connection failed: {e}")
+            logger.warning(f"[flexium] Connection failed: {e}")
             return False
 
     def disconnect(self) -> None:

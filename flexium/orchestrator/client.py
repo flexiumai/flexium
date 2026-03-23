@@ -410,6 +410,7 @@ class OrchestratorClient:
         """Attempt to reconnect and re-register."""
         try:
             if self.connect():
+                logger.info("[flexium] Connected, re-registering...")
                 result = self.register(
                     process_id=self._process_id,
                     device=self._current_device,
@@ -427,6 +428,10 @@ class OrchestratorClient:
                     logger.info("[flexium] Orchestrator reconnected!")
                     logger.info("[flexium] Migration re-enabled")
                     return True
+                else:
+                    logger.warning("[flexium] Re-registration failed")
+            else:
+                logger.warning("[flexium] Reconnect failed: could not connect")
         except Exception as e:
             logger.info(f"[flexium] Reconnection failed: {e}")
 
