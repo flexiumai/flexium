@@ -77,7 +77,7 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 
 - **Seamless Migration**: Training continues from the exact batch where it stopped
 - **Zero VRAM Residue**: When a process migrates, the source GPU has **0 MB** used
-- **Minimal Code Changes**: As few as 2 lines to integrate
+- **Minimal Code Changes**: Just 2 lines to integrate
 - **Web Dashboard**: Real-time monitoring and one-click migration
 - **Works Offline**: Training continues even if server connection is lost
 - **No Server Installation**: Just `pip install flexium` - no agents or daemons needed
@@ -140,22 +140,35 @@ for epoch in range(100):
 ### After (With Flexium)
 
 ```python
-import flexium.auto  # Add this line
+import flexium
+flexium.init()  # That's it!
+
 import torch
 
-with flexium.auto.run():  # Add this line
-    model = Net().cuda()
-    optimizer = torch.optim.Adam(model.parameters())
+model = Net().cuda()
+optimizer = torch.optim.Adam(model.parameters())
 
-    for epoch in range(100):
-        for batch in dataloader:
-            data = batch.cuda()
-            loss = model(data).sum()
-            loss.backward()
-            optimizer.step()
+for epoch in range(100):
+    for batch in dataloader:
+        data = batch.cuda()
+        loss = model(data).sum()
+        loss.backward()
+        optimizer.step()
 ```
 
 **That's it!** Your training is now migration-enabled.
+
+??? note "Explicit Scope Control (Advanced)"
+    For cases where you need explicit control over when Flexium is active:
+    ```python
+    import flexium.auto
+
+    with flexium.auto.run():
+        model = Net().cuda()
+        # Flexium is active only within this block
+        for epoch in range(100):
+            ...
+    ```
 
 ---
 
@@ -219,7 +232,7 @@ See the [Installation Guide](installation.md) for detailed instructions includin
 │  ┌─────────────────────────────────────────────────────┐  │
 │  │                  Training Process                   │  │
 │  │  - Your PyTorch training code                       │  │
-│  │  - Wrapped with flexium.auto.run()                  │  │
+│  │  - Initialized with flexium.init()                  │  │
 │  └─────────────────────────────────────────────────────┘  │
 │                                                           │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
@@ -333,7 +346,7 @@ Test on GPU 0, then move to production GPU:
 | [GPU Error Recovery](features/gpu-error-recovery.md) | Automatic recovery from OOM, ECC, and other GPU errors |
 | [Pause/Resume](features/pause-resume.md) | Pause training to free GPU, resume later |
 | [Works Offline](features/graceful-degradation.md) | Training continues even if server connection is lost |
-| [Lightning Integration](features/lightning-integration.md) | PyTorch Lightning support with FlexiumCallback |
+| [Framework Compatibility](features/framework-compatibility.md) | Works with PyTorch Lightning, Hugging Face, timm, and more |
 
 ---
 
