@@ -5,6 +5,11 @@ A Vision Transformer for CIFAR-10 image classification.
 Demonstrates patch embedding, positional encoding,
 and transformer encoder for vision tasks.
 
+Note: This example uses flexium.auto.run() for explicit scope control.
+For simpler integration, use flexium.init() instead:
+    import flexium
+    flexium.init()
+
 Usage:
     # With flexium (default)
     python vit_train.py

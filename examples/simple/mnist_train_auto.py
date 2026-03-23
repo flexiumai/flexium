@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """MNIST training with TRANSPARENT flexium (minimal code changes).
 
-This demonstrates the flexium.auto API - just ONE import and ONE context manager.
+This demonstrates the flexium.init() API - just 2 lines of code.
 Everything else is standard PyTorch code!
-
-Compare with mnist_train.py which uses the explicit API.
 
 Usage:
     # With orchestrator (set via env or config file)
@@ -12,13 +10,10 @@ Usage:
     python examples/mnist_train_auto.py
 
     # With orchestrator (inline)
-    python examples/mnist_train_auto.py --orchestrator app.flexium.ai
+    python examples/mnist_train_auto.py --server app.flexium.ai/myworkspace
 
     # Baseline benchmark (no flexium - good for PyCharm debugging)
     python examples/mnist_train_auto.py --disabled
-
-    # Local mode (no orchestrator, still get device management)
-    python examples/mnist_train_auto.py --orchestrator ""
 
 PyCharm Tips:
     - For debugging, use --disabled flag (runs without flexium)
@@ -43,8 +38,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-# === THIS IS THE ONLY IMPORT YOU NEED ===
-import flexium.auto
+# === FLEXIUM: Just import and init ===
+import flexium
 
 
 class Net(nn.Module):
@@ -70,9 +65,9 @@ class Net(nn.Module):
 def main() -> None:
     parser = argparse.ArgumentParser(description="MNIST with transparent flexium")
     parser.add_argument(
-        "--orchestrator",
+        "--server",
         default=None,
-        help="Orchestrator address (e.g., app.flexium.ai/myworkspace). Uses FLEXIUM_SERVER env var if not set.",
+        help="Server address (e.g., app.flexium.ai/myworkspace). Uses FLEXIUM_SERVER env var if not set.",
     )
     parser.add_argument(
         "--device",
@@ -83,7 +78,7 @@ def main() -> None:
         "--epochs",
         type=int,
         default=1000,
-        help="Number of epochs (default: 10)",
+        help="Number of epochs (default: 1000)",
     )
     parser.add_argument(
         "--disabled",
@@ -103,88 +98,86 @@ def main() -> None:
     random.seed(args.seed)
     np.random.seed(args.seed)
 
-    # === THIS IS THE ONLY CHANGE TO YOUR TRAINING CODE ===
-    with flexium.auto.run(
-        orchestrator=args.orchestrator,
-        device=args.device,
-        disabled=args.disabled,
-    ):
-        # =====================================================
-        # EVERYTHING BELOW IS 100% STANDARD PYTORCH CODE
-        # No ctx.device, no iterate() wrapper, nothing special!
-        # =====================================================
+    # === FLEXIUM: Just 2 lines! ===
+    if not args.disabled:
+        flexium.init(server=args.server, device=args.device)
 
-        # Data loading
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,)),
-        ])
+    # =====================================================
+    # EVERYTHING BELOW IS 100% STANDARD PYTORCH CODE
+    # No ctx.device, no iterate() wrapper, nothing special!
+    # =====================================================
 
-        train_data = datasets.MNIST(
-            "./data",
-            train=True,
-            download=True,
-            transform=transform,
-        )
+    # Data loading
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])
 
-        # Create DataLoader with fixed seed for reproducible shuffling
-        generator = torch.Generator()
-        generator.manual_seed(args.seed)
-        train_loader = DataLoader(
-            train_data,
-            batch_size=64,
-            shuffle=True,
-            generator=generator,
-            num_workers=0,  # Use 0 for easier debugging
-        )
+    train_data = datasets.MNIST(
+        "./data",
+        train=True,
+        download=True,
+        transform=transform,
+    )
 
-        print("\nDataLoader created:")
-        print(f"  Dataset size: {len(train_data)}")
-        print(f"  Batch count: {len(train_loader)}")
-        print()
+    # Create DataLoader with fixed seed for reproducible shuffling
+    generator = torch.Generator()
+    generator.manual_seed(args.seed)
+    train_loader = DataLoader(
+        train_data,
+        batch_size=64,
+        shuffle=True,
+        generator=generator,
+        num_workers=0,  # Use 0 for easier debugging
+    )
 
-        # Model setup - just use .cuda() as normal!
-        model = Net().cuda()
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+    print("\nDataLoader created:")
+    print(f"  Dataset size: {len(train_data)}")
+    print(f"  Batch count: {len(train_loader)}")
+    print()
 
-        # Training loop - standard PyTorch
-        # Migration happens transparently via heartbeat thread
-        for epoch in range(args.epochs):
-            epoch_start = time.time()
-            total_loss = 0.0
-            correct = 0
-            total = 0
+    # Model setup - just use .cuda() as normal!
+    model = Net().cuda()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-            for batch_idx, (data, target) in enumerate(train_loader):
-                # Just use .cuda() - flexium handles device routing!
-                data, target = data.cuda(), target.cuda()
+    # Training loop - standard PyTorch
+    # Migration happens transparently via heartbeat thread
+    for epoch in range(args.epochs):
+        epoch_start = time.time()
+        total_loss = 0.0
+        correct = 0
+        total = 0
 
-                optimizer.zero_grad()
-                output = model(data)
-                loss = F.nll_loss(output, target)
-                loss.backward()
-                optimizer.step()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            # Just use .cuda() - flexium handles device routing!
+            data, target = data.cuda(), target.cuda()
 
-                total_loss += loss.item()
-                pred = output.argmax(dim=1)
-                correct += pred.eq(target).sum().item()
-                total += target.size(0)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = F.nll_loss(output, target)
+            loss.backward()
+            optimizer.step()
 
-                if batch_idx % 100 == 0:
-                    print(
-                        f"Epoch {epoch:2d} | Batch {batch_idx:4d} | "
-                        f"Loss: {loss.item():.4f} | "
-                        f"Acc: {100.0 * correct / total:.1f}%"
-                    )
+            total_loss += loss.item()
+            pred = output.argmax(dim=1)
+            correct += pred.eq(target).sum().item()
+            total += target.size(0)
 
-            epoch_time = time.time() - epoch_start
-            if len(train_loader) > 0 and total > 0:
+            if batch_idx % 100 == 0:
                 print(
-                    f">>> Epoch {epoch} done | "
-                    f"Avg Loss: {total_loss / len(train_loader):.4f} | "
-                    f"Acc: {100.0 * correct / total:.1f}% | "
-                    f"Time: {epoch_time:.2f}s\n"
+                    f"Epoch {epoch:2d} | Batch {batch_idx:4d} | "
+                    f"Loss: {loss.item():.4f} | "
+                    f"Acc: {100.0 * correct / total:.1f}%"
                 )
+
+        epoch_time = time.time() - epoch_start
+        if len(train_loader) > 0 and total > 0:
+            print(
+                f">>> Epoch {epoch} done | "
+                f"Avg Loss: {total_loss / len(train_loader):.4f} | "
+                f"Acc: {100.0 * correct / total:.1f}% | "
+                f"Time: {epoch_time:.2f}s\n"
+            )
 
 
 if __name__ == "__main__":

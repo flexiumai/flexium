@@ -5,6 +5,11 @@ A simplified implementation of DDPM for image generation.
 Demonstrates handling of complex training loops with
 timestep conditioning and noise scheduling.
 
+Note: This example uses flexium.auto.run() for explicit scope control.
+For simpler integration, use flexium.init() instead:
+    import flexium
+    flexium.init()
+
 Usage:
     # With flexium (default)
     python ddpm_train.py

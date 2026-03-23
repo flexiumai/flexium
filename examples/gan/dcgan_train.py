@@ -5,6 +5,11 @@ A Deep Convolutional GAN trained on CIFAR-10.
 Demonstrates handling of two models (generator + discriminator)
 and alternating optimization steps.
 
+Note: This example uses flexium.auto.run() for explicit scope control.
+For simpler integration, use flexium.init() instead:
+    import flexium
+    flexium.init()
+
 Usage:
     # With flexium (default)
     python dcgan_train.py
