@@ -240,18 +240,21 @@ class OrchestratorClient:
             Assigned device, or None if registration failed.
         """
         hostname = socket.gethostname()
+        logger.info(f"[flexium] register() called for {process_id} on {device}")
 
         # Get GPU UUID for reliable identification
         gpu_uuid = ""
         gpu_name = ""
         try:
             from flexium.utils.gpu_info import get_gpu_info
+            logger.info(f"[flexium] Getting GPU info for {device}...")
             gpu_info = get_gpu_info(device)
+            logger.info(f"[flexium] Got GPU info: {gpu_info}")
             if gpu_info:
                 gpu_uuid = gpu_info.uuid
                 gpu_name = gpu_info.name
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[flexium] Failed to get GPU info: {e}")
 
         # Store for reconnection
         self._process_id = process_id
@@ -413,6 +416,7 @@ class OrchestratorClient:
         try:
             if self.connect():
                 logger.info("[flexium] Connected, re-registering...")
+                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={self._current_device}")
                 result = self.register(
                     process_id=self._process_id,
                     device=self._current_device,
