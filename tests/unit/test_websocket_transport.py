@@ -102,6 +102,26 @@ class TestWebSocketTransportConnect:
             assert call_kwargs[0][0] == "https://example.com"
             assert call_kwargs[1]["auth"] == {"workspace": "workspace1"}
 
+    def test_connect_uses_polling_only_transport(self):
+        """Test that connect uses polling-only transport.
+
+        Polling is more reliable through proxies/Cloudflare and avoids
+        sticky session issues with multiple server workers.
+        """
+        from flexium.orchestrator.websocket_transport import WebSocketTransport
+
+        transport = WebSocketTransport("https://example.com", "workspace1")
+
+        with patch.object(transport, "_create_socket") as mock_create:
+            mock_sio = MagicMock()
+            mock_create.return_value = mock_sio
+
+            transport.connect()
+
+            call_kwargs = mock_sio.connect.call_args
+            assert call_kwargs[1]["transports"] == ["polling"], \
+                "Transport should be polling-only for reliability through proxies"
+
     def test_connect_returns_true_on_success(self):
         """Test that connect returns True on success."""
         from flexium.orchestrator.websocket_transport import WebSocketTransport
