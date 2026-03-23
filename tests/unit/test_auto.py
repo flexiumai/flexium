@@ -97,27 +97,10 @@ class TestRunContextManager:
         # Mock orchestrator connection to avoid network calls
         with patch("flexium.auto._connect_orchestrator"):
             with patch("flexium.auto._disconnect_orchestrator"):
-                with patch("flexium.auto._patch_module_cuda"):
-                    with patch("flexium.auto._patch_tensor_cuda"):
-                        with auto.run(orchestrator=""):
-                            assert auto._process_id.startswith("gpu-")
-                            assert len(auto._process_id) > 4
+                with auto.run(orchestrator=""):
+                    assert auto._process_id.startswith("gpu-")
+                    assert len(auto._process_id) > 4
 
-
-class TestPyTorchPatches:
-    """Tests for PyTorch patching functions."""
-
-    def test_patch_module_cuda_patches_class(self) -> None:
-        """Test _patch_module_cuda modifies nn.Module class."""
-        import flexium.auto as auto
-
-        with patch("torch.nn.Module") as mock_module:
-            original_cuda = MagicMock()
-            mock_module.cuda = original_cuda
-
-            auto._patch_module_cuda()
-
-            # The cuda method should have been replaced
 
 class TestHeartbeat:
     """Tests for heartbeat functionality."""
@@ -1650,34 +1633,6 @@ class TestDisconnectOrchestrator:
 
         finally:
             auto._orchestrator_client = original_client
-
-
-class TestPatchModuleCuda:
-    """Tests for _patch_module_cuda function."""
-
-    def test_patch_module_cuda_modifies_module_class(self) -> None:
-        """Test _patch_module_cuda patches Module.cuda method."""
-        import flexium.auto as auto
-
-        # Check that the function exists and is callable
-        assert callable(auto._patch_module_cuda)
-
-        # The patching is done at import time, so we just verify
-        # the function doesn't raise when called again
-        try:
-            auto._patch_module_cuda()
-        except Exception:
-            pass  # May fail if torch not available
-
-
-class TestPatchTensorCuda:
-    """Tests for _patch_tensor_cuda function."""
-
-    def test_patch_tensor_cuda_exists(self) -> None:
-        """Test _patch_tensor_cuda function exists."""
-        import flexium.auto as auto
-
-        assert callable(auto._patch_tensor_cuda)
 
 
 class TestRunContextManagerAdditional:
@@ -3314,31 +3269,6 @@ class TestDebugHeartbeatOutput:
 
         assert "_heartbeat_debug_counter" in source
         assert "_DEBUG" in source
-
-
-class TestPatchFunctions:
-    """Tests for PyTorch patch functions."""
-
-    def test_patch_module_cuda_routes_to_current_device(self) -> None:
-        """Test patched Module.cuda routes to _current_device."""
-        import flexium.auto as auto
-        import inspect
-
-        source = inspect.getsource(auto._patch_module_cuda)
-
-        # Should reference _current_device for routing
-        assert "_current_device" in source
-
-    def test_patch_tensor_cuda_handles_cpu_mode(self) -> None:
-        """Test patched Tensor.cuda handles CPU mode."""
-        import flexium.auto as auto
-        import inspect
-
-        source = inspect.getsource(auto._patch_tensor_cuda)
-
-        # Should check for CPU mode
-        assert 'cpu' in source
-        assert "_current_device" in source
 
 
 class TestHeartbeatReconnectionStates:

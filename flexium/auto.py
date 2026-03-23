@@ -1262,58 +1262,6 @@ def _disconnect_orchestrator() -> None:
         _orchestrator_client = None
 
 
-def _patch_module_cuda() -> None:
-    """Patch nn.Module.cuda() to route to current device.
-
-    This ensures that model.cuda() goes to the correct GPU after migration,
-    since driver migration swaps GPU identities at the driver level.
-    """
-    try:
-        import torch.nn as nn
-
-        original_cuda = nn.Module.cuda
-
-        def patched_cuda(self, device=None):
-            # If no device specified, route to _current_device
-            if device is None and _current_device != "cpu":
-                return self.to(_current_device)
-            elif _current_device == "cpu":
-                return self.to("cpu")
-            else:
-                return original_cuda(self, device)
-
-        nn.Module.cuda = patched_cuda
-        logger.debug("Patched nn.Module.cuda for device routing")
-
-    except ImportError:
-        pass
-
-
-def _patch_tensor_cuda() -> None:
-    """Patch Tensor.cuda() to route to current device (including CPU)."""
-    try:
-        import torch
-
-        original_tensor_cuda = torch.Tensor.cuda
-
-        def patched_tensor_cuda(self, device=None, non_blocking=False):
-            # If we're on CPU, return CPU tensor instead
-            if _current_device == "cpu":
-                return self.cpu()
-            # If no device specified, route to _current_device
-            # This ensures data.cuda() goes to the right GPU after migration
-            if device is None:
-                return self.to(_current_device, non_blocking=non_blocking)
-            # Otherwise use normal cuda() behavior with specified device
-            return original_tensor_cuda(self, device, non_blocking)
-
-        torch.Tensor.cuda = patched_tensor_cuda
-        logger.debug("Patched Tensor.cuda for device routing")
-
-    except ImportError:
-        pass
-
-
 @contextmanager
 def run(
     orchestrator: Optional[str] = None,
@@ -1375,11 +1323,6 @@ def run(
         print_no_orchestrator_warning()
     print("-" * 50)
     sys.stdout.flush()
-
-    # Install patches for device routing
-    # These ensure .cuda() calls go to the correct GPU after migration
-    _patch_module_cuda()
-    _patch_tensor_cuda()
 
     # Connect to orchestrator
     _connect_orchestrator(config)
