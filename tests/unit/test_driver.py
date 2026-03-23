@@ -98,8 +98,8 @@ class TestDriverAvailability:
 class TestCheckDriverVersion:
     """Tests for _check_driver_version function."""
 
-    def test_check_driver_version_success(self) -> None:
-        """Test _check_driver_version with valid version."""
+    def test_check_driver_version_580_migration_capable(self) -> None:
+        """Test _check_driver_version with driver 580+ (full migration)."""
         from flexium import _driver
 
         mock_result = MagicMock()
@@ -110,8 +110,52 @@ class TestCheckDriverVersion:
             result = _driver._check_driver_version()
             assert result is True
 
-    def test_check_driver_version_too_old(self) -> None:
-        """Test _check_driver_version with old driver."""
+    def test_check_driver_version_550_pause_capable(self) -> None:
+        """Test _check_driver_version with driver 550 (minimum for pause/resume).
+
+        Driver 550+ should pass _check_driver_version() because pause/resume
+        works even if full migration doesn't.
+        """
+        from flexium import _driver
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "550.54.14\n"
+
+        with patch("subprocess.run", return_value=mock_result):
+            result = _driver._check_driver_version()
+            assert result is True, "Driver 550 should pass - pause/resume works"
+
+    def test_check_driver_version_575_pause_only(self) -> None:
+        """Test _check_driver_version with driver 575 (pause only, no migration).
+
+        Driver 575 should pass _check_driver_version() for pause/resume,
+        but supports_migration() should return False.
+        """
+        from flexium import _driver
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "575.57.08\n"
+
+        with patch("subprocess.run", return_value=mock_result):
+            result = _driver._check_driver_version()
+            assert result is True, "Driver 575 should pass - pause/resume works"
+
+    def test_check_driver_version_549_too_old(self) -> None:
+        """Test _check_driver_version with driver 549 (too old for anything)."""
+        from flexium import _driver
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "549.99.99\n"
+
+        with patch("subprocess.run", return_value=mock_result):
+            result = _driver._check_driver_version()
+            assert result is False, "Driver 549 is below minimum 550"
+
+    def test_check_driver_version_470_too_old(self) -> None:
+        """Test _check_driver_version with old driver 470."""
         from flexium import _driver
 
         mock_result = MagicMock()
