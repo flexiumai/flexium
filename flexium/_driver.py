@@ -47,16 +47,23 @@ def _get_search_paths() -> List[Path]:
     home = Path.home()
     tool = _get_tool_name()
 
+    # Start with the bundled binary in the package
+    package_dir = Path(__file__).parent
     paths = [
+        package_dir / "bin" / tool,  # Bundled with package
+    ]
+
+    # Add common system paths
+    paths.extend([
         home / "bin" / tool,
         Path("/usr/local/cuda/bin") / tool,
         Path("/usr/bin") / tool,
         Path("/opt/cuda/bin") / tool,
-    ]
+    ])
 
     # Add versioned CUDA installations
     for cuda_dir in sorted(home.glob("cuda-*"), reverse=True):
-        paths.insert(0, cuda_dir / "bin" / tool)
+        paths.insert(1, cuda_dir / "bin" / tool)  # After bundled, before system
 
     return paths
 

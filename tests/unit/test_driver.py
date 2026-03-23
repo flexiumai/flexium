@@ -610,6 +610,29 @@ class TestIsAvailableSearchPaths:
             _driver._interface_path = original_path
 
 
+class TestGetSearchPaths:
+    """Tests for _get_search_paths function."""
+
+    def test_get_search_paths_includes_bundled_binary(self) -> None:
+        """Test that search paths include the bundled binary in the package.
+
+        This is critical - the binary is shipped with the package and should
+        be found without requiring manual installation.
+        """
+        from flexium import _driver
+        from pathlib import Path
+
+        paths = _driver._get_search_paths()
+        package_dir = Path(_driver.__file__).parent
+        tool_name = _driver._get_tool_name()
+        bundled_path = package_dir / "bin" / tool_name
+
+        assert bundled_path in paths, \
+            f"Bundled binary path {bundled_path} should be in search paths"
+        assert paths[0] == bundled_path, \
+            "Bundled binary should be first in search paths"
+
+
 class TestSupportsMigration:
     """Tests for supports_migration function."""
 
