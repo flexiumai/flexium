@@ -154,7 +154,6 @@ class WebSocketTransport(Transport):
             # Use polling transport only - more reliable through proxies/Cloudflare
             # and avoids sticky session issues with multiple gunicorn workers.
             # WebSocket upgrade fails when requests hit different workers.
-            logger.info(f"[flexium] Connecting to {self._server_url} workspace={self._workspace}")
             self._sio.connect(
                 self._server_url,
                 socketio_path="/socket.io",
@@ -163,10 +162,9 @@ class WebSocketTransport(Transport):
                 headers={},
                 auth={"workspace": self._workspace},
             )
-            logger.info(f"[flexium] Socket.IO connected: {self._connected}")
             return True
         except Exception as e:
-            logger.warning(f"[flexium] Connection failed: {e}")
+            logger.debug(f"Connection failed: {e}")
             return False
 
     def disconnect(self) -> None:
@@ -200,17 +198,11 @@ class WebSocketTransport(Transport):
             return None
 
         try:
-            logger.debug(f"[flexium] Emitting {event} to server")
             self._sio.emit(event, data)
-            logger.debug(f"[flexium] Waiting for {event}_response (timeout={timeout}s)")
             response = self._wait_for_response(event, timeout)
-            if response is None:
-                logger.warning(f"[flexium] No response for {event} (timeout or error)")
-            else:
-                logger.debug(f"[flexium] Got {event} response: {response.get('success', 'N/A')}")
             return response
         except Exception as e:
-            logger.warning(f"[flexium] Send {event} failed: {e}")
+            logger.debug(f"Send failed: {e}")
             self._connected = False
             return None
 

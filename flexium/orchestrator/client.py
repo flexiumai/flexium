@@ -244,7 +244,6 @@ class OrchestratorClient:
             Assigned device, or None if registration failed.
         """
         hostname = socket.gethostname()
-        logger.info(f"[flexium] register() called for {process_id} on {device}")
 
         # Get GPU UUID for reliable identification
         # Skip if reconnecting (GPU may be paused/checkpointed and pynvml will hang)
@@ -254,13 +253,10 @@ class OrchestratorClient:
             # Use cached values from previous registration
             gpu_uuid = self._gpu_uuid
             gpu_name = self._gpu_name
-            logger.info(f"[flexium] Using cached GPU info: {gpu_uuid}, {gpu_name}")
         else:
             try:
                 from flexium.utils.gpu_info import get_gpu_info
-                logger.info(f"[flexium] Getting GPU info for {device}...")
                 gpu_info = get_gpu_info(device)
-                logger.info(f"[flexium] Got GPU info: {gpu_info}")
                 if gpu_info:
                     gpu_uuid = gpu_info.uuid
                     gpu_name = gpu_info.name
@@ -297,7 +293,6 @@ class OrchestratorClient:
                     continue
 
             # Send register message
-            logger.info(f"[flexium] Sending register for {process_id} on {device}")
             response = self._transport.send("register", {
                 "process_id": process_id,
                 "device": device,
@@ -315,7 +310,6 @@ class OrchestratorClient:
                 "start_time": start_time,
                 "memory_reserved": _memory_reserved,
             })
-            logger.info(f"[flexium] Register response: {response}")
 
             if response and response.get("success"):
                 self._current_device = response.get("assigned_device", device)
@@ -430,7 +424,6 @@ class OrchestratorClient:
                 # Use __PAUSED__ if we're reconnecting while paused
                 device = "__PAUSED__" if self._is_paused else self._current_device
                 logger.info("[flexium] Connected, re-registering...")
-                logger.info(f"[flexium] _try_reconnect: process_id={self._process_id}, device={device}, is_paused={self._is_paused}, migratable={self._migratable}")
                 result = self.register(
                     process_id=self._process_id,
                     device=device,

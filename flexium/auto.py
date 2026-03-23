@@ -1121,9 +1121,6 @@ def _attempt_reconnect() -> bool:
             sys.stdout.flush()
             return False
 
-        print("[flexium] Connected, sending re-registration...")
-        sys.stdout.flush()
-
         # Re-register with stored settings
         result = _orchestrator_client.register(
             process_id=_process_id,
@@ -1138,9 +1135,6 @@ def _attempt_reconnect() -> bool:
             migratable=getattr(_orchestrator_client, '_migratable', True),
             start_time=_start_time,
         )
-
-        print(f"[flexium] Registration result: {result}")
-        sys.stdout.flush()
 
         if result:
             # Send a heartbeat with cached device info so server knows about GPUs
