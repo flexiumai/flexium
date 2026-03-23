@@ -319,6 +319,60 @@ class TestOrchestratorClientHeartbeat:
 
         assert result is None
 
+    def test_heartbeat_connection_lost_enters_local_mode(self) -> None:
+        """Test heartbeat enters local mode when connection is lost after registration."""
+        from flexium.orchestrator.client import OrchestratorClient, ConnectionState
+        from flexium.orchestrator.transport import MockTransport
+
+        transport = MockTransport()
+        client = OrchestratorClient(transport=transport)
+        client.register(process_id="test-123", device="cuda:0")
+
+        # Verify initially connected
+        assert client._state == ConnectionState.CONNECTED
+
+        # Simulate connection loss - prevent auto-reconnect by making connect fail
+        transport._connected = False
+        original_connect = transport.connect
+        transport.connect = lambda: False
+
+        # Heartbeat should detect disconnect and enter local mode
+        result = client.heartbeat()
+
+        # Restore for cleanup
+        transport.connect = original_connect
+
+        assert result is None
+        assert client._state == ConnectionState.LOCAL_MODE
+
+    def test_heartbeat_reconnection_attempt_in_local_mode(self) -> None:
+        """Test heartbeat attempts reconnection when in local mode."""
+        from flexium.orchestrator.client import OrchestratorClient, ConnectionState
+        from flexium.orchestrator.transport import MockTransport
+
+        transport = MockTransport()
+        client = OrchestratorClient(transport=transport)
+        client.register(process_id="test-123", device="cuda:0")
+
+        # Simulate connection loss
+        transport._connected = False
+        client._state = ConnectionState.LOCAL_MODE
+
+        # First heartbeat won't reconnect (just sets last_reconnect_attempt)
+        client.heartbeat()
+
+        # Force reconnect attempt by setting last attempt far in past
+        client._last_reconnect_attempt = 0
+
+        # Reconnect transport
+        transport._connected = True
+
+        # Next heartbeat should successfully reconnect
+        result = client.heartbeat()
+
+        # Should be back to connected state after successful reconnect
+        assert client._state == ConnectionState.CONNECTED
+
 
 class TestOrchestratorClientCompleteMigration:
     """Tests for complete_migration method."""

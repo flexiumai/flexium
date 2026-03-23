@@ -358,6 +358,12 @@ class OrchestratorClient:
             Response dict with migration/pause commands, or None if failed.
         """
         if not self.is_connected:
+            # Connection lost - enter local mode and try reconnection
+            if self._state == ConnectionState.CONNECTED:
+                logger.warning("[flexium] Connection to orchestrator lost")
+                logger.info("[flexium] Switching to local mode - will attempt reconnection periodically")
+                self._state = ConnectionState.LOCAL_MODE
+
             # Try reconnection in local mode
             if self._state == ConnectionState.LOCAL_MODE:
                 if self._should_attempt_reconnect():
@@ -423,6 +429,9 @@ class OrchestratorClient:
                     return True
         except Exception as e:
             logger.info(f"[flexium] Reconnection failed: {e}")
+
+        # Reconnect failed - stay in local mode
+        self._state = ConnectionState.LOCAL_MODE
 
         return False
 
