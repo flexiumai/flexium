@@ -187,9 +187,9 @@ def _verify_environment() -> bool:
     except ImportError:
         issues.append("PyTorch is not installed")
 
-    # Check driver interface availability
+    # Check driver interface availability (550+ for pause, 580+ for migration)
     if not _driver.is_available():
-        issues.append("NVIDIA driver 580+ required for GPU migration")
+        issues.append("NVIDIA driver 550+ required for pause/resume (580+ for migration)")
 
     if issues:
         _migration_enabled = False

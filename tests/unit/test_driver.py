@@ -564,3 +564,54 @@ class TestIsAvailableSearchPaths:
             _driver._interface_disabled = original_disabled
             _driver._interface_available = original_available
             _driver._interface_path = original_path
+
+
+class TestSupportsMigration:
+    """Tests for supports_migration function."""
+
+    def test_supports_migration_when_not_available(self) -> None:
+        """Test supports_migration returns False when driver not available."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=False):
+            assert _driver.supports_migration() is False
+
+    def test_supports_migration_with_driver_580(self) -> None:
+        """Test supports_migration returns True with driver 580+."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=True):
+            with patch.object(_driver, "_get_driver_version", return_value=580):
+                assert _driver.supports_migration() is True
+
+    def test_supports_migration_with_driver_590(self) -> None:
+        """Test supports_migration returns True with driver 590."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=True):
+            with patch.object(_driver, "_get_driver_version", return_value=590):
+                assert _driver.supports_migration() is True
+
+    def test_supports_migration_with_driver_575(self) -> None:
+        """Test supports_migration returns False with driver 575 (pause only)."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=True):
+            with patch.object(_driver, "_get_driver_version", return_value=575):
+                assert _driver.supports_migration() is False
+
+    def test_supports_migration_with_driver_550(self) -> None:
+        """Test supports_migration returns False with driver 550 (pause only)."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=True):
+            with patch.object(_driver, "_get_driver_version", return_value=550):
+                assert _driver.supports_migration() is False
+
+    def test_supports_migration_driver_version_none(self) -> None:
+        """Test supports_migration returns False when version unavailable."""
+        from flexium import _driver
+
+        with patch.object(_driver, "is_available", return_value=True):
+            with patch.object(_driver, "_get_driver_version", return_value=None):
+                assert _driver.supports_migration() is False

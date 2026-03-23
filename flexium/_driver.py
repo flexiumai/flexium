@@ -23,8 +23,11 @@ _interface_available: Optional[bool] = None
 _interface_path: Optional[Path] = None
 _interface_disabled: bool = False
 
-# Minimum driver version for state capture support
-_MIN_DRIVER_VERSION = 580
+# Minimum driver version for pause/resume (state capture on same GPU)
+_MIN_DRIVER_VERSION = 550
+
+# Minimum driver version for full migration (restore to different GPU)
+_MIGRATION_DRIVER_VERSION = 580
 
 # Interface tool identifier (constructed to avoid plain-text scanning)
 _TOOL_ID = bytes([
@@ -118,8 +121,8 @@ def is_available() -> bool:
     return False
 
 
-def _check_driver_version() -> bool:
-    """Check if the NVIDIA driver version meets requirements."""
+def _get_driver_version() -> Optional[int]:
+    """Get the major NVIDIA driver version."""
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
@@ -129,17 +132,41 @@ def _check_driver_version() -> bool:
         )
         if result.returncode == 0:
             version_str = result.stdout.strip().split("\n")[0]
-            major_version = int(version_str.split(".")[0])
-            if major_version < _MIN_DRIVER_VERSION:
-                logger.debug(
-                    f"Driver version {version_str} < {_MIN_DRIVER_VERSION}, "
-                    "zero-residue migration not available"
-                )
-                return False
-            return True
+            return int(version_str.split(".")[0])
     except Exception as e:
         logger.debug(f"Could not check driver version: {e}")
-    return False
+    return None
+
+
+def _check_driver_version() -> bool:
+    """Check if the NVIDIA driver version meets minimum requirements (550+)."""
+    major_version = _get_driver_version()
+    if major_version is None:
+        return False
+    if major_version < _MIN_DRIVER_VERSION:
+        logger.debug(
+            f"Driver version {major_version} < {_MIN_DRIVER_VERSION}, "
+            "pause/resume not available"
+        )
+        return False
+    return True
+
+
+def supports_migration() -> bool:
+    """Check if the driver supports full GPU migration (580+).
+
+    Drivers 550-579 support pause/resume on the same GPU.
+    Drivers 580+ support full migration to a different GPU.
+
+    Returns:
+        True if driver supports migration to different GPU.
+    """
+    if not is_available():
+        return False
+    major_version = _get_driver_version()
+    if major_version is None:
+        return False
+    return major_version >= _MIGRATION_DRIVER_VERSION
 
 
 def get_interface_path() -> Optional[Path]:
