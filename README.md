@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/flexiumai/flexium/main/assets/logo_with_text.png" alt="Flexium.AI Logo" width="350">
+  <img src="https://raw.githubusercontent.com/flexiumai/flexium/master/assets/logo_with_text.png" alt="Flexium.AI Logo" width="350">
 </p>
 
 <p align="center">
