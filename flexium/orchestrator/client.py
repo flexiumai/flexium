@@ -244,6 +244,11 @@ class OrchestratorClient:
             Assigned device, or None if registration failed.
         """
         hostname = socket.gethostname()
+        try:
+            import getpass
+            username = getpass.getuser()
+        except Exception:
+            username = ""
 
         # Get GPU UUID for reliable identification
         # Skip if reconnecting (GPU may be paused/checkpointed and pynvml will hang)
@@ -297,6 +302,7 @@ class OrchestratorClient:
                 "process_id": process_id,
                 "device": device,
                 "hostname": hostname,
+                "username": username,
                 "metadata": metadata or {},
                 "gpu_uuid": gpu_uuid,
                 "gpu_name": gpu_name,

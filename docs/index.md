@@ -75,13 +75,13 @@ Flexium is a GPU orchestration system that enables **dynamic device migration** 
 
 ### Key Features
 
-- **Seamless Migration**: Training continues from the exact batch where it stopped
-- **Zero VRAM Residue**: When a process migrates, the source GPU has **0 MB** used
-- **Minimal Code Changes**: Just 2 lines to integrate
-- **Web Dashboard**: Real-time monitoring and one-click migration
-- **Works Offline**: Training continues even if server connection is lost
-- **No Server Installation**: Just `pip install flexium` - no agents or daemons needed
-- **GPU Error Recovery**: Auto-recover from OOM and GPU errors by migrating to healthy GPU
+- **Seamless Migration**: Training continues from the exact point where it left off. No progress lost
+- **Zero VRAM Residue**: When you migrate, the source GPU is completely freed. Not 99%, literally 0 bytes used
+- **Zero Server Installation**: Just `pip install flexium`. No agents, daemons, or infrastructure needed
+- **Minimal Code Changes**: Add 2 lines of code, done. Works with PyTorch Lightning, Hugging Face, timm, and more
+- **Cloud Dashboard**: Monitor all jobs in real-time. One-click migration at [app.flexium.ai](https://app.flexium.ai)
+- **Graceful Degradation**: Lost connection? Training keeps running. Reconnects automatically when available
+- **GPU Error Recovery**: OOM or ECC errors? Auto-recover by migrating to a healthy GPU
 
 ### The Problem
 
@@ -220,6 +220,12 @@ See the [Installation Guide](installation.md) for detailed instructions includin
    - See all running training jobs
    - One-click migration between GPUs
    - Pause and resume training
+
+![Dashboard](images/dashboard/dashboard.png)
+
+**Live Migration Demo:**
+
+![Migration Demo](images/dashboard/migration-split-demo.gif)
 
 ---
 
