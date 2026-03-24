@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flexium"
-version = "0.2.6"
+version = "0.2.7"
 description = "Flexium.AI - Flexible Resource Allocation for GPU training with live migration"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -163,7 +163,7 @@ exclude_lines = [
 # Usage: tbump 0.2.0a3
 
 [tool.tbump.version]
-current = "0.2.6"
+current = "0.2.7"
 
 # Version regex pattern - supports:
 # - release: 0.2.0
