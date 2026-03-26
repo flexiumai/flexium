@@ -39,6 +39,10 @@ from __future__ import annotations
 import atexit
 from typing import Optional
 
+# GPU layer for testing/mocking
+from flexium.gpu import GPUInterface, GPUInfo, DeviceReport, NvidiaGPU, MockGPU
+from flexium.utils.gpu_info import set_gpu_backend, get_gpu_backend
+
 __version__ = "0.2.7"
 
 # Track if init() has been called
@@ -131,9 +135,6 @@ def is_initialized() -> bool:
     """Check if Flexium has been initialized."""
     return _initialized
 
-# GPU layer for testing/mocking
-from flexium.gpu import GPUInterface, GPUInfo, DeviceReport, NvidiaGPU, MockGPU
-from flexium.utils.gpu_info import set_gpu_backend, get_gpu_backend
 
 __all__ = [
     "__version__",

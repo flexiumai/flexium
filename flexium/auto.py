@@ -1148,7 +1148,7 @@ def _attempt_reconnect() -> bool:
                         gpu_uuid=gpu_uuid,
                         gpu_name=gpu_name,
                     )
-                    logger.debug(f"Sent reconnect heartbeat with cached device info")
+                    logger.debug("Sent reconnect heartbeat with cached device info")
                 except Exception as e:
                     logger.warning(f"Failed to send reconnect heartbeat: {e}")
 

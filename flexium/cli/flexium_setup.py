@@ -78,7 +78,7 @@ Examples:
         log(f"  ✓ GPU migration supported (driver {MIGRATION_DRIVER_VERSION}+)")
     else:
         log(f"  ⚠ GPU migration requires driver {MIGRATION_DRIVER_VERSION}+")
-        log(f"    Pause/resume on same GPU is available")
+        log("    Pause/resume on same GPU is available")
 
     # Check/install cuda-checkpoint
     log("")
@@ -105,7 +105,7 @@ Examples:
                 existing = None
     else:
         if args.force and existing:
-            log(f"  → Force re-download requested")
+            log("  → Force re-download requested")
         else:
             log("  → Not found")
 
