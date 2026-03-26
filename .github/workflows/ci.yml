@@ -25,6 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e ".[dev]"
+          # Install PyTorch CPU version for testing (faster than CUDA version)
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Run unit tests with coverage
         run: |
