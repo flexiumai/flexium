@@ -501,10 +501,16 @@ class TestPauseFunctionality:
 
         original_client = auto._orchestrator_client
         original_path = _driver._interface_path
+        original_migration_enabled = auto._migration_enabled
+        original_current_device = auto._current_device
+        original_physical_device = auto._physical_device
 
         try:
             auto._orchestrator_client = mock_client
             _driver._interface_path = "/fake/path"
+            auto._migration_enabled = True  # Must be True to proceed
+            auto._current_device = "cuda:0"  # Must be GPU
+            auto._physical_device = "cuda:0"
 
             with patch.object(auto, "_check_driver_interface_available", mock_check_available):
                 with patch.object(auto, "_driver_lock", mock_lock):
@@ -521,6 +527,9 @@ class TestPauseFunctionality:
         finally:
             auto._orchestrator_client = original_client
             _driver._interface_path = original_path
+            auto._migration_enabled = original_migration_enabled
+            auto._current_device = original_current_device
+            auto._physical_device = original_physical_device
 
     def test_do_pause_fails_without_driver(self) -> None:
         """Test _do_pause fails when driver migration unavailable.

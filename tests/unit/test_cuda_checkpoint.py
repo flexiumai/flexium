@@ -6,6 +6,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from tests.conftest import requires_nvidia_driver
+
 from flexium.utils.cuda_checkpoint import (
     find_cuda_checkpoint,
     get_bundled_path,
@@ -65,6 +67,7 @@ class TestFindCudaCheckpoint:
 class TestVerifyCudaCheckpoint:
     """Tests for verify_cuda_checkpoint()."""
 
+    @requires_nvidia_driver
     def test_verify_existing(self):
         """Should verify existing cuda-checkpoint."""
         path = find_cuda_checkpoint()
@@ -79,6 +82,7 @@ class TestVerifyCudaCheckpoint:
 class TestGetCudaCheckpointVersion:
     """Tests for get_cuda_checkpoint_version()."""
 
+    @requires_nvidia_driver
     def test_get_version_existing(self):
         """Should get version from existing cuda-checkpoint."""
         path = find_cuda_checkpoint()
@@ -170,6 +174,7 @@ class TestBundledBinary:
         path = get_bundled_path()
         assert os.access(path, os.X_OK), f"Bundled binary not executable: {path}"
 
+    @requires_nvidia_driver
     def test_bundled_works(self):
         """Bundled binary should run successfully."""
         path = get_bundled_path()

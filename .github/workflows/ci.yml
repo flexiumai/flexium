@@ -27,6 +27,8 @@ jobs:
           pip install -e ".[dev]"
           # Install PyTorch CPU version for testing (faster than CUDA version)
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Install PyYAML for config file tests
+          pip install pyyaml
 
       - name: Run unit tests with coverage
         run: |

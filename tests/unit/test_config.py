@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.conftest import requires_pyyaml
+
 from flexium.config import (
     ENV_DEVICE,
     ENV_ORCHESTRATOR,
@@ -124,6 +126,7 @@ class TestFindConfigFile:
 class TestLoadYamlFile:
     """Tests for _load_yaml_file function."""
 
+    @requires_pyyaml
     def test_loads_valid_yaml(self, tmp_path: Path) -> None:
         """Test loading a valid YAML file."""
         config_file = tmp_path / "config.yaml"
@@ -134,6 +137,7 @@ class TestLoadYamlFile:
         assert result["orchestrator"] == "localhost:80"
         assert result["device"] == "cuda:1"
 
+    @requires_pyyaml
     def test_returns_empty_dict_for_invalid_yaml(self, tmp_path: Path) -> None:
         """Test returning empty dict for invalid YAML."""
         config_file = tmp_path / "config.yaml"
@@ -147,6 +151,7 @@ class TestLoadYamlFile:
         result = _load_yaml_file(tmp_path / "nonexistent.yaml")
         assert result == {}
 
+    @requires_pyyaml
     def test_returns_empty_dict_for_non_dict_yaml(self, tmp_path: Path) -> None:
         """Test returning empty dict when YAML is not a dict."""
         config_file = tmp_path / "config.yaml"
@@ -198,6 +203,7 @@ class TestLoadConfig:
         assert config.orchestrator == "env-server:80"
         assert config.device == "cuda:5"
 
+    @requires_pyyaml
     def test_file_config_used_when_no_env_or_inline(self, tmp_path: Path) -> None:
         """Test that file config is used when no env vars or inline params."""
         config_file = tmp_path / ".flexiumrc"
@@ -210,6 +216,7 @@ class TestLoadConfig:
         assert config.orchestrator == "file-server:80"
         assert config.device == "cuda:3"
 
+    @requires_pyyaml
     def test_partial_env_override(self, tmp_path: Path) -> None:
         """Test partial override with environment variables."""
         config_file = tmp_path / ".flexiumrc"

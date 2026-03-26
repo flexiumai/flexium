@@ -4,6 +4,9 @@ Tests the complete installation flow that users experience:
 1. pip install flexium -> binary is bundled
 2. import flexium.auto -> binary is found, update check runs
 3. Training runs -> cuda-checkpoint is available
+
+Note: Many tests require NVIDIA driver/CUDA to be available.
+These are skipped in CI environments without GPU support.
 """
 
 import os
@@ -14,6 +17,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
+
+from tests.conftest import requires_nvidia_driver
 
 
 class TestInstallationFlow:
@@ -38,6 +43,7 @@ class TestInstallationFlow:
         content = license_path.read_text()
         assert "NVIDIA" in content
 
+    @requires_nvidia_driver
     def test_import_flexium_auto_works(self):
         """Verify importing flexium.auto succeeds."""
         # This should work without errors
@@ -51,6 +57,7 @@ class TestInstallationFlow:
         path = ensure_cuda_checkpoint()
         assert path.exists()
 
+    @requires_nvidia_driver
     def test_binary_runs_successfully(self):
         """Verify bundled binary executes correctly."""
         from flexium.utils.cuda_checkpoint import get_bundled_path
@@ -67,6 +74,7 @@ class TestInstallationFlow:
         assert "CUDA checkpoint" in result.stdout
         assert "Version" in result.stdout
 
+    @requires_nvidia_driver
     def test_version_detection_works(self):
         """Verify version can be extracted from binary."""
         from flexium.utils.cuda_checkpoint import get_bundled_path, get_cuda_checkpoint_version
@@ -112,6 +120,7 @@ class TestUpdateFlow:
             result = check_for_update()
             assert result is None
 
+    @requires_nvidia_driver
     def test_ensure_uses_bundled_when_update_fails(self):
         """Verify bundled binary is used when update download fails."""
         import flexium.utils.cuda_checkpoint as cc
@@ -221,6 +230,7 @@ class TestCLISetup:
         from flexium.cli.flexium_setup import main
         assert callable(main)
 
+    @requires_nvidia_driver
     def test_cli_check_mode(self):
         """Test --check mode doesn't modify anything."""
         from flexium.cli.flexium_setup import main

@@ -201,22 +201,23 @@ class TestGetGpuInfo:
 
     def test_get_gpu_info_cuda_device(self) -> None:
         """Test get_gpu_info with CUDA device."""
-        from flexium.utils.gpu_info import get_gpu_info
+        from flexium.utils.gpu_info import get_gpu_info, GPUInfo, GPUType
 
-        mock_handle = MagicMock()
-        mock_memory_info = MagicMock()
-        mock_memory_info.total = 16 * 1024**3
+        # Mock the full chain - get_gpu_info calls get_gpu_info_pynvml which needs pynvml
+        mock_result = {
+            "uuid": "GPU-TEST-1234-1234-1234-123456789012",
+            "name": "Test GPU",
+            "memory_total": 16 * 1024**3,
+            "gpu_type": GPUType.PHYSICAL,
+        }
 
-        with patch("pynvml.nvmlInit"):
-            with patch("pynvml.nvmlDeviceGetHandleByIndex", return_value=mock_handle):
-                with patch("pynvml.nvmlDeviceGetUUID", return_value="GPU-TEST"):
-                    with patch("pynvml.nvmlDeviceGetName", return_value="Test GPU"):
-                        with patch("pynvml.nvmlDeviceGetMemoryInfo", return_value=mock_memory_info):
-                            with patch("pynvml.nvmlDeviceGetMigMode", side_effect=AttributeError("No MIG")):
-                                with patch("pynvml.nvmlShutdown"):
-                                    result = get_gpu_info("cuda:0")
+        with patch("flexium.utils.gpu_info._get_visible_device_indices", return_value=[0]):
+            with patch("flexium.utils.gpu_info.get_gpu_info_pynvml", return_value=mock_result):
+                result = get_gpu_info("cuda:0")
 
-                                    assert result is not None
+                assert result is not None
+                assert result.uuid == "GPU-TEST-1234-1234-1234-123456789012"
+                assert result.name == "Test GPU"
 
 
 class TestParseMigUuid:
